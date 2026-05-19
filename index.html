@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LINE風トーク画面メーカー</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Mock chat builder</p>
+        <h1>LINE風トーク画面メーカー</h1>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="controls" aria-label="編集パネル">
+        <form id="settingsForm" class="panel">
+          <div class="panel-title">
+            <h2>トーク設定</h2>
+            <button type="button" id="resetButton" class="ghost-button">初期化</button>
+          </div>
+
+          <label class="field">
+            <span>表示日付</span>
+            <input id="dateInput" type="date" />
+          </label>
+
+          <label class="field">
+            <span>既定の時刻</span>
+            <input id="defaultTimeInput" type="time" />
+          </label>
+
+          <label class="field">
+            <span>相手の名前</span>
+            <input id="partnerNameInput" type="text" maxlength="24" placeholder="相手の名前" />
+          </label>
+
+          <label class="check-row">
+            <input id="showAvatarInput" type="checkbox" />
+            <span>相手のアイコンを表示する</span>
+          </label>
+
+          <label class="file-field">
+            <span>相手のアイコン画像</span>
+            <input id="avatarInput" type="file" accept="image/*" />
+          </label>
+        </form>
+
+        <form id="messageForm" class="panel">
+          <div class="panel-title">
+            <h2>メッセージ作成</h2>
+            <span id="editHint" class="edit-hint">新規追加</span>
+          </div>
+
+          <fieldset class="segmented" aria-label="送信者">
+            <legend>送信者</legend>
+            <label>
+              <input type="radio" name="sender" value="me" checked />
+              <span>自分</span>
+            </label>
+            <label>
+              <input type="radio" name="sender" value="them" />
+              <span>相手</span>
+            </label>
+          </fieldset>
+
+          <fieldset class="segmented" aria-label="種類">
+            <legend>種類</legend>
+            <label>
+              <input type="radio" name="messageType" value="text" checked />
+              <span>テキスト</span>
+            </label>
+            <label>
+              <input type="radio" name="messageType" value="image" />
+              <span>画像</span>
+            </label>
+          </fieldset>
+
+          <label id="textField" class="field">
+            <span>本文</span>
+            <textarea id="messageTextInput" rows="4" maxlength="500" placeholder="表示したいトーク文を入力"></textarea>
+          </label>
+
+          <label id="imageField" class="file-field hidden">
+            <span>送信画像</span>
+            <input id="messageImageInput" type="file" accept="image/*" />
+          </label>
+
+          <div id="imagePreviewWrap" class="upload-preview hidden">
+            <img id="imagePreview" alt="アップロード画像プレビュー" />
+          </div>
+
+          <div class="inline-grid">
+            <label class="field">
+              <span>時刻</span>
+              <input id="messageTimeInput" type="time" />
+            </label>
+            <label class="check-row read-toggle">
+              <input id="readInput" type="checkbox" checked />
+              <span>既読を付ける</span>
+            </label>
+          </div>
+
+          <div class="button-row">
+            <button type="submit" id="submitMessageButton" class="primary-button">追加</button>
+            <button type="button" id="cancelEditButton" class="secondary-button hidden">編集をやめる</button>
+          </div>
+        </form>
+
+        <section class="panel message-list-panel" aria-label="メッセージ一覧">
+          <div class="panel-title">
+            <h2>メッセージ一覧</h2>
+            <button type="button" id="clearButton" class="ghost-button">全削除</button>
+          </div>
+          <div id="messageList" class="message-list"></div>
+        </section>
+      </section>
+
+      <section class="preview-area" aria-label="プレビュー">
+        <div class="preview-toolbar">
+          <button type="button" id="downloadButton" class="primary-button">PNG保存</button>
+        </div>
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="status-bar">
+              <span id="statusTime">14:20</span>
+              <span>5G 100%</span>
+            </div>
+            <header class="talk-header">
+              <button class="icon-button" type="button" aria-label="戻る">‹</button>
+              <div class="header-avatar" id="headerAvatar"></div>
+              <strong id="headerName">佐藤さん</strong>
+              <button class="icon-button" type="button" aria-label="メニュー">≡</button>
+            </header>
+            <div class="chat-stream" id="chatStream"></div>
+            <footer class="composer-bar" aria-hidden="true">
+              <button type="button">＋</button>
+              <div class="fake-input">メッセージを入力</div>
+              <button type="button">▶</button>
+            </footer>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
