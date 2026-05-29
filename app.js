@@ -20,6 +20,8 @@ const talkMetrics = {
   textPadX: 16,
   textPadY: 11,
   textFontSize: 18,
+  textFontWeight: 500,
+  textFontFamily: "'Meiryo', 'Yu Gothic', sans-serif",
   textLineHeight: 24,
   bubbleRadius: 22,
   myCornerRadius: 22,
@@ -940,7 +942,7 @@ function measureMessageBlock(ctx, message, width, imageCache) {
     return { bubbleWidth: imageWidth, bubbleHeight: imageHeight, height: imageHeight, lines: [] };
   }
 
-  ctx.font = `${talkMetrics.textFontSize}px 'Yu Gothic', Meiryo, sans-serif`;
+  ctx.font = `${talkMetrics.textFontWeight} ${talkMetrics.textFontSize}px ${talkMetrics.textFontFamily}`;
   const avatarSpace = message.sender === "them" && state.showAvatar ? talkMetrics.avatarSize + talkMetrics.avatarGap : 0;
   const availableBubbleWidth =
     width - talkMetrics.sidePad - talkMetrics.rightPad - avatarSpace - talkMetrics.metaWidth - talkMetrics.metaGap;
@@ -1007,8 +1009,8 @@ function drawMessageBlock(ctx, message, block, width, y, avatarImage, uploadIcon
       radius,
       message.sender === "me" ? "#8ee86c" : "#ffffff"
     );
-    ctx.fillStyle = "#171c1c";
-    ctx.font = `${talkMetrics.textFontSize}px 'Yu Gothic', Meiryo, sans-serif`;
+    ctx.fillStyle = "#050707";
+    ctx.font = `${talkMetrics.textFontWeight} ${talkMetrics.textFontSize}px ${talkMetrics.textFontFamily}`;
     ctx.textBaseline = "top";
     block.lines.forEach((line, index) => {
       ctx.fillText(line, bubbleX + talkMetrics.textPadX, y + talkMetrics.textPadY + index * talkMetrics.textLineHeight);
@@ -1248,7 +1250,7 @@ function drawVariableRoundedRect(ctx, x, y, width, height, radius, fill) {
 }
 
 function getBubbleTextLayout(text, sender, maxTextWidth = getPreviewTextWidth(sender)) {
-  textMeasureContext.font = `${talkMetrics.textFontSize}px 'Yu Gothic', Meiryo, sans-serif`;
+  textMeasureContext.font = `${talkMetrics.textFontWeight} ${talkMetrics.textFontSize}px ${talkMetrics.textFontFamily}`;
   const lines = wrapText(textMeasureContext, text, maxTextWidth);
   const textWidth = Math.max(42, ...lines.map((line) => textMeasureContext.measureText(line).width));
   return {

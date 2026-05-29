@@ -640,7 +640,9 @@ input[type="file"] {
   max-width: 100%;
   padding: 10px 16px 11px;
   border-radius: 22px;
-  color: #171c1c;
+  color: #050707;
+  font-family: "Meiryo", "Yu Gothic", system-ui, sans-serif;
+  font-weight: 500;
   line-height: 1.28;
   font-size: 1.12rem;
   text-wrap: balance;
