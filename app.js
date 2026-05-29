@@ -12,23 +12,23 @@ const backgroundColors = {
 const chatTopPadding = 16;
 const talkMetrics = {
   sidePad: 8,
-  rightPad: 10,
+  rightPad: 8,
   avatarSize: 30,
   avatarGap: 8,
   metaGap: 10,
   metaWidth: 44,
-  textPadX: 16,
+  textPadX: 14,
   textPadY: 10,
   textFontSize: 18,
   textLineHeight: 23,
   bubbleRadius: 22,
   myCornerRadius: 22,
-  tailWidth: 22,
+  tailWidth: 20,
   tailHeight: 18,
   metaFontSize: 12.5,
   metaLineHeight: 14,
   maxTheirBubbleWidth: 278,
-  maxMyBubbleWidth: 270
+  maxMyBubbleWidth: 302
 };
 const textMeasureContext = document.createElement("canvas").getContext("2d");
 
@@ -1287,11 +1287,7 @@ function wrapParagraphBalanced(ctx, paragraph, maxWidth) {
   const chars = [...paragraph];
   if (!chars.length) return [""];
 
-  const greedyLines = wrapParagraphGreedy(ctx, chars, maxWidth);
-  if (greedyLines.length <= 1 || chars.length > 120) return greedyLines;
-
-  const balanced = balanceParagraphLines(ctx, chars, maxWidth, greedyLines.length);
-  return balanced || greedyLines;
+  return wrapParagraphGreedy(ctx, chars, maxWidth);
 }
 
 function wrapParagraphGreedy(ctx, chars, maxWidth) {
