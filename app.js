@@ -5,7 +5,7 @@ const demoImageSrc =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 460'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='1'%3E%3Cstop stop-color='%23ffe08a'/%3E%3Cstop offset='.52' stop-color='%23ff7a59'/%3E%3Cstop offset='1' stop-color='%2306c755'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='640' height='460' rx='34' fill='url(%23g)'/%3E%3Ccircle cx='500' cy='100' r='70' fill='rgba(255,255,255,.42)'/%3E%3Cpath d='M70 345 235 190l105 98 75-70 155 127z' fill='rgba(255,255,255,.78)'/%3E%3Ctext x='54' y='72' fill='white' font-family='Arial,sans-serif' font-size='42' font-weight='700'%3EImage message%3C/text%3E%3C/svg%3E";
 const uploadIconSrc = "./upload-icon.png?v=20260530-2";
 const backgroundColors = {
-  blue: "#8fa8c6",
+  blue: "#8fabd4",
   pink: "#efb4c7",
   image: "#dbe8f1"
 };
@@ -35,12 +35,12 @@ const talkMetrics = {
 const textMeasureContext = document.createElement("canvas").getContext("2d");
 
 const state = {
-  partnerName: "佐藤さん",
+  partnerName: "",
   date: defaultDate,
   defaultTime: "14:20",
   showAvatar: false,
-  showInitialDate: true,
-  showOuterFrame: false,
+  showInitialDate: false,
+  showOuterFrame: true,
   backgroundColor: "blue",
   decorationTheme: "none",
   backgroundImageSrc: "",
@@ -143,7 +143,7 @@ function bindEvents() {
   });
 
   elements.partnerNameInput.addEventListener("input", (event) => {
-    state.partnerName = event.target.value.trim() || "相手";
+    state.partnerName = event.target.value.trim();
     render();
   });
 
@@ -489,12 +489,12 @@ function clearEditor() {
 }
 
 function resetAll() {
-  state.partnerName = "佐藤さん";
+  state.partnerName = "";
   state.date = defaultDate;
   state.defaultTime = "14:20";
   state.showAvatar = false;
-  state.showInitialDate = true;
-  state.showOuterFrame = false;
+  state.showInitialDate = false;
+  state.showOuterFrame = true;
   state.backgroundColor = "blue";
   state.decorationTheme = "none";
   state.backgroundImageSrc = "";
@@ -516,18 +516,22 @@ function resetAll() {
 
 function swapRoles() {
   state.messages = state.messages.map((message) =>
-    message.type === "date"
-      ? message
-      : {
-          ...message,
-          sender: message.sender === "me" ? "them" : "me"
-        }
+    {
+      if (message.type === "date") return message;
+      const sender = message.sender === "me" ? "them" : "me";
+      return {
+        ...message,
+        sender,
+        read: sender === "me"
+      };
+    }
   );
 
   if (state.editId) {
     const editedMessage = state.messages.find((message) => message.id === state.editId);
     if (editedMessage && editedMessage.type !== "date") {
       document.querySelector(`input[name='sender'][value='${editedMessage.sender}']`).checked = true;
+      elements.readInput.checked = Boolean(editedMessage.read);
       syncReadAvailability();
     }
   }
