@@ -17,8 +17,8 @@ const talkMetrics = {
   avatarGap: 8,
   metaGap: 10,
   metaWidth: 44,
-  textPadX: 16,
-  textPadY: 11,
+  textPadX: 12,
+  textPadY: 8,
   textFontSize: 18,
   textFontWeight: 500,
   textFontFamily: "'Meiryo', 'Yu Gothic', sans-serif",
@@ -29,8 +29,8 @@ const talkMetrics = {
   tailHeight: 18,
   metaFontSize: 12.5,
   metaLineHeight: 14,
-  maxTheirBubbleWidth: 278,
-  maxMyBubbleWidth: 286
+  maxTheirBubbleWidth: 270,
+  maxMyBubbleWidth: 278
 };
 const textMeasureContext = document.createElement("canvas").getContext("2d");
 

@@ -638,7 +638,7 @@ input[type="file"] {
   overflow-wrap: anywhere;
   min-width: 46px;
   max-width: 100%;
-  padding: 10px 16px 11px;
+  padding: 7px 12px 8px;
   border-radius: 22px;
   color: #050707;
   font-family: "Meiryo", "Yu Gothic", system-ui, sans-serif;
