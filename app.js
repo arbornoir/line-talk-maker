@@ -541,19 +541,21 @@ function renderMessageTypeFields() {
 }
 
 function handleSenderChange() {
-  const sender = document.querySelector("input[name='sender']:checked").value;
-  if (sender === "them") {
-    elements.readInput.checked = false;
-  }
   syncReadAvailability();
   if (state.editId) {
+    const sender = document.querySelector("input[name='sender']:checked").value;
     elements.editHint.textContent = sender === "me" ? "編集中：自分" : "編集中：相手";
   }
 }
 
 function syncReadAvailability() {
-  elements.readInput.disabled = false;
-  elements.readInput.parentElement.style.opacity = "1";
+  const sender = document.querySelector("input[name='sender']:checked").value;
+  const isThem = sender === "them";
+  if (isThem) {
+    elements.readInput.checked = false;
+  }
+  elements.readInput.disabled = isThem;
+  elements.readInput.parentElement.style.opacity = isThem ? "0.5" : "1";
 }
 
 async function downloadTalkPng() {
@@ -616,12 +618,13 @@ async function renderPhoneDomToCanvas() {
   ]
     .map((name) => `${name}:${rootStyles.getPropertyValue(name)};`)
     .join("");
+  const serializedClone = new XMLSerializer().serializeToString(clone);
   const markup = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${width * scale}" height="${height * scale}" viewBox="0 0 ${width} ${height}">
       <foreignObject width="100%" height="100%">
         <div xmlns="http://www.w3.org/1999/xhtml" style="${cssVars}">
-          <style>${cssText}</style>
-          ${clone.outerHTML}
+          <style>/*<![CDATA[*/${cssText}/*]]>*/</style>
+          ${serializedClone}
         </div>
       </foreignObject>
     </svg>
@@ -633,6 +636,10 @@ async function renderPhoneDomToCanvas() {
   canvas.height = height * scale;
   const ctx = canvas.getContext("2d");
   ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const centerPixel = ctx.getImageData(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1).data;
+  if (centerPixel[3] === 0) {
+    throw new Error("DOM capture produced an empty canvas");
+  }
   return canvas;
 }
 
