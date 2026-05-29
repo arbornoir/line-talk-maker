@@ -591,7 +591,7 @@ input[type="file"] {
 }
 
 .message-row.them.avatar-hidden .bubble-wrap {
-  margin-left: 20px;
+  margin-left: 10px;
 }
 
 .message-row.me {
@@ -615,7 +615,7 @@ input[type="file"] {
 .message-row.me .bubble-wrap {
   flex-direction: row-reverse;
   max-width: 90%;
-  margin-right: 20px;
+  margin-right: 10px;
 }
 
 .message-row.image .bubble-wrap {
@@ -638,17 +638,17 @@ input[type="file"] {
   overflow-wrap: anywhere;
   min-width: 46px;
   max-width: 100%;
-  padding: 12px 17px;
-  border-radius: 23px;
+  padding: 9px 16px 10px;
+  border-radius: 22px;
   color: #171c1c;
-  line-height: 1.42;
+  line-height: 1.28;
   font-size: 1.12rem;
   white-space: pre-wrap;
 }
 
 .message-row.me:not(.image) .bubble {
   border-top-right-radius: 3px;
-  border-bottom-right-radius: 23px;
+  border-bottom-right-radius: 22px;
   background: var(--my-bubble);
 }
 
@@ -661,11 +661,11 @@ input[type="file"] {
   content: "";
   position: absolute;
   z-index: -1;
-  top: -9px;
-  left: -12px;
-  width: 28px;
-  height: 30px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 30'%3E%3Cpath fill='%23ffffff' d='M19 8L8 8Q5 8 3 4L1 0Q4 10 8 15Q10 17 10 22L19 22Z'/%3E%3C/svg%3E");
+  top: -6px;
+  left: -8px;
+  width: 20px;
+  height: 22px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 22'%3E%3Cpath fill='%23ffffff' d='M14 6H8.5C6 6 4.5 4.7 3.5 2.3L2.6 0C3.8 5.9 5.9 9.6 8.2 11.8C9.5 13.1 9.8 14.9 9.3 18H14V6Z'/%3E%3C/svg%3E");
   background-position: center;
   background-repeat: no-repeat;
   background-size: 100% 100%;
@@ -675,11 +675,11 @@ input[type="file"] {
   content: "";
   position: absolute;
   z-index: -1;
-  top: -9px;
-  right: -12px;
-  width: 28px;
-  height: 30px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 30'%3E%3Cpath fill='%238ee86c' d='M9 8L20 8Q23 8 25 4L27 0Q24 10 20 15Q18 17 18 22L9 22Z'/%3E%3C/svg%3E");
+  top: -6px;
+  right: -8px;
+  width: 20px;
+  height: 22px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 22'%3E%3Cpath fill='%238ee86c' d='M6 6H11.5C14 6 15.5 4.7 16.5 2.3L17.4 0C16.2 5.9 14.1 9.6 11.8 11.8C10.5 13.1 10.2 14.9 10.7 18H6V6Z'/%3E%3C/svg%3E");
   background-position: center;
   background-repeat: no-repeat;
   background-size: 100% 100%;

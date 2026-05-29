@@ -17,14 +17,14 @@ const talkMetrics = {
   avatarGap: 8,
   metaGap: 10,
   metaWidth: 44,
-  textPadX: 17,
-  textPadY: 12,
+  textPadX: 16,
+  textPadY: 10,
   textFontSize: 18,
-  textLineHeight: 26,
-  bubbleRadius: 23,
-  myCornerRadius: 23,
-  tailWidth: 30,
-  tailHeight: 24,
+  textLineHeight: 23,
+  bubbleRadius: 22,
+  myCornerRadius: 22,
+  tailWidth: 22,
+  tailHeight: 18,
   metaFontSize: 12.5,
   metaLineHeight: 14,
   maxTheirBubbleWidth: 278,
@@ -1006,9 +1006,11 @@ function drawMessageBlock(ctx, message, block, width, y, avatarImage, uploadIcon
     );
     ctx.fillStyle = "#171c1c";
     ctx.font = `${talkMetrics.textFontSize}px 'Yu Gothic', Meiryo, sans-serif`;
+    ctx.textBaseline = "top";
     block.lines.forEach((line, index) => {
       ctx.fillText(line, bubbleX + talkMetrics.textPadX, y + talkMetrics.textPadY + index * talkMetrics.textLineHeight);
     });
+    ctx.textBaseline = "top";
   }
 
   drawMeta(ctx, message, metaX, y + block.bubbleHeight - (message.read ? 29 : 17));
@@ -1048,13 +1050,13 @@ function drawTheirTail(ctx, x, y) {
   ctx.save();
   ctx.fillStyle = "#ffffff";
   ctx.beginPath();
-  ctx.moveTo(x + 7, y - 1);
-  ctx.lineTo(x - 4, y - 1);
-  ctx.quadraticCurveTo(x - 7, y - 1, x - 9, y - 5);
-  ctx.lineTo(x - 11, y - 9);
-  ctx.quadraticCurveTo(x - 8, y + 1, x - 4, y + 6);
-  ctx.quadraticCurveTo(x - 2, y + 8, x - 2, y + 13);
-  ctx.lineTo(x + 7, y + 13);
+  ctx.moveTo(x + 6, y);
+  ctx.lineTo(x - 1, y);
+  ctx.quadraticCurveTo(x - 4, y, x - 5.5, y - 3.5);
+  ctx.lineTo(x - 7, y - 6);
+  ctx.quadraticCurveTo(x - 5.2, y + 2.8, x - 1.8, y + 7);
+  ctx.quadraticCurveTo(x - 0.2, y + 8.8, x - 0.9, y + 12);
+  ctx.lineTo(x + 6, y + 12);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
@@ -1064,13 +1066,13 @@ function drawMyTail(ctx, x, y) {
   ctx.save();
   ctx.fillStyle = "#8ee86c";
   ctx.beginPath();
-  ctx.moveTo(x - 7, y - 1);
-  ctx.lineTo(x + 4, y - 1);
-  ctx.quadraticCurveTo(x + 7, y - 1, x + 9, y - 5);
-  ctx.lineTo(x + 11, y - 9);
-  ctx.quadraticCurveTo(x + 8, y + 1, x + 4, y + 6);
-  ctx.quadraticCurveTo(x + 2, y + 8, x + 2, y + 13);
-  ctx.lineTo(x - 7, y + 13);
+  ctx.moveTo(x - 6, y);
+  ctx.lineTo(x + 1, y);
+  ctx.quadraticCurveTo(x + 4, y, x + 5.5, y - 3.5);
+  ctx.lineTo(x + 7, y - 6);
+  ctx.quadraticCurveTo(x + 5.2, y + 2.8, x + 1.8, y + 7);
+  ctx.quadraticCurveTo(x + 0.2, y + 8.8, x + 0.9, y + 12);
+  ctx.lineTo(x - 6, y + 12);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
