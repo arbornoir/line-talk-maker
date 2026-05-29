@@ -452,8 +452,8 @@ input[type="file"] {
 
 .phone-screen.outer-hidden .chat-stream {
   height: 100%;
-  padding-top: 24px;
-  padding-bottom: 18px;
+  padding-top: 16px;
+  padding-bottom: 20px;
 }
 
 .status-bar,
@@ -490,8 +490,8 @@ input[type="file"] {
   grid-template-columns: 38px 34px minmax(0, 1fr) 36px 36px 36px;
   gap: 8px;
   align-items: center;
-  min-height: 76px;
-  padding: 8px 10px;
+  min-height: 64px;
+  padding: 7px 10px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   background: #ffffff;
 }
@@ -556,32 +556,33 @@ input[type="file"] {
   z-index: 2;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  height: calc(100% - 184px);
+  gap: 9px;
+  height: calc(100% - 172px);
   overflow: auto;
-  padding: 24px 12px 18px;
+  padding: 16px 8px 20px;
 }
 
 .date-chip {
   align-self: center;
   max-width: 88%;
-  padding: 5px 12px;
+  padding: 6px 14px;
   border-radius: 999px;
   background: rgba(82, 99, 112, 0.42);
   color: #fff;
-  font-size: 0.74rem;
+  font-size: 0.76rem;
   font-weight: 800;
 }
 
 .message-row {
   display: grid;
-  gap: 6px;
+  column-gap: 8px;
+  row-gap: 6px;
   width: 100%;
 }
 
 .message-row.them {
-  grid-template-columns: 36px minmax(0, 1fr);
-  align-items: end;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: start;
   justify-items: start;
 }
 
@@ -589,13 +590,17 @@ input[type="file"] {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.message-row.them.avatar-hidden .bubble-wrap {
+  margin-left: 20px;
+}
+
 .message-row.me {
   justify-items: end;
 }
 
 .avatar {
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   align-self: start;
 }
@@ -603,12 +608,14 @@ input[type="file"] {
 .bubble-wrap {
   display: flex;
   align-items: flex-end;
-  gap: 6px;
-  max-width: 86%;
+  gap: 10px;
+  max-width: 94%;
 }
 
 .message-row.me .bubble-wrap {
   flex-direction: row-reverse;
+  max-width: 90%;
+  margin-right: 20px;
 }
 
 .message-row.image .bubble-wrap {
@@ -627,36 +634,55 @@ input[type="file"] {
 
 .bubble {
   position: relative;
+  z-index: 0;
   overflow-wrap: anywhere;
-  min-width: 42px;
+  min-width: 46px;
   max-width: 100%;
-  padding: 9px 11px;
-  border-radius: 16px;
+  padding: 12px 17px;
+  border-radius: 23px;
   color: #171c1c;
-  line-height: 1.45;
-  font-size: 0.92rem;
+  line-height: 1.42;
+  font-size: 1.12rem;
   white-space: pre-wrap;
 }
 
 .message-row.me .bubble {
-  border-bottom-right-radius: 4px;
+  border-top-right-radius: 3px;
+  border-bottom-right-radius: 23px;
   background: var(--my-bubble);
 }
 
 .message-row.them .bubble {
-  border-top-left-radius: 4px;
+  border-top-left-radius: 3px;
   background: var(--their-bubble);
 }
 
 .message-row.them:not(.image) .bubble::before {
   content: "";
   position: absolute;
-  top: 2px;
-  left: -6px;
-  width: 12px;
-  height: 12px;
-  background: var(--their-bubble);
-  clip-path: polygon(100% 0, 0 0, 100% 100%);
+  z-index: -1;
+  top: -9px;
+  left: -12px;
+  width: 28px;
+  height: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 30'%3E%3Cpath fill='%23ffffff' d='M19 8L8 8Q5 8 3 4L1 0Q4 10 8 15Q10 17 10 22L19 22Z'/%3E%3C/svg%3E");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+.message-row.me:not(.image) .bubble::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: -9px;
+  right: -12px;
+  width: 28px;
+  height: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 30'%3E%3Cpath fill='%238ee86c' d='M9 8L20 8Q23 8 25 4L27 0Q24 10 20 15Q18 17 18 22L9 22Z'/%3E%3C/svg%3E");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
 }
 
 .image-bubble {
@@ -692,12 +718,14 @@ input[type="file"] {
 
 .meta {
   display: grid;
-  gap: 2px;
-  min-width: 35px;
-  color: #f5f7f6;
-  font-size: 0.68rem;
+  gap: 1px;
+  min-width: 44px;
+  margin-bottom: 8px;
+  color: rgba(48, 52, 60, 0.78);
+  font-size: 0.78rem;
+  font-weight: 500;
   line-height: 1.1;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  text-shadow: none;
 }
 
 .message-row.me .meta {

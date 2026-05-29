@@ -9,7 +9,27 @@ const backgroundColors = {
   pink: "#efb4c7",
   image: "#dbe8f1"
 };
-const chatTopPadding = 24;
+const chatTopPadding = 16;
+const talkMetrics = {
+  sidePad: 8,
+  rightPad: 10,
+  avatarSize: 30,
+  avatarGap: 8,
+  metaGap: 10,
+  metaWidth: 44,
+  textPadX: 17,
+  textPadY: 12,
+  textFontSize: 18,
+  textLineHeight: 26,
+  bubbleRadius: 23,
+  myCornerRadius: 23,
+  tailWidth: 30,
+  tailHeight: 24,
+  metaFontSize: 12.5,
+  metaLineHeight: 14,
+  maxTheirBubbleWidth: 278,
+  maxMyBubbleWidth: 270
+};
 
 const state = {
   partnerName: "佐藤さん",
@@ -521,9 +541,12 @@ function renderMessageTypeFields() {
 }
 
 function handleSenderChange() {
+  const sender = document.querySelector("input[name='sender']:checked").value;
+  if (sender === "them") {
+    elements.readInput.checked = false;
+  }
   syncReadAvailability();
   if (state.editId) {
-    const sender = document.querySelector("input[name='sender']:checked").value;
     elements.editHint.textContent = sender === "me" ? "編集中：自分" : "編集中：相手";
   }
 }
@@ -549,8 +572,119 @@ async function downloadTalkPng() {
 }
 
 async function renderTalkToCanvas() {
-  const width = 390;
-  const height = 760;
+  try {
+    return await renderPhoneDomToCanvas();
+  } catch (error) {
+    console.warn("DOM capture failed; using canvas fallback.", error);
+    return renderTalkToCanvasManual();
+  }
+}
+
+async function renderPhoneDomToCanvas() {
+  const source = elements.phoneScreen;
+  const rect = source.getBoundingClientRect();
+  const width = Math.max(320, Math.round(rect.width || 390));
+  const height = Math.max(600, Math.round(rect.height || 760));
+  const scale = 2;
+  const clone = source.cloneNode(true);
+  const originalStream = source.querySelector("#chatStream");
+  const clonedStream = clone.querySelector("#chatStream");
+
+  inlineComputedStyles(source, clone);
+  if (originalStream && clonedStream) {
+    preserveScrollPosition(originalStream, clonedStream);
+  }
+
+  clone.style.width = `${width}px`;
+  clone.style.height = `${height}px`;
+  clone.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+  clone.querySelectorAll("[id]").forEach((element) => element.removeAttribute("id"));
+
+  const cssText = collectSameOriginCss();
+  const rootStyles = getComputedStyle(document.documentElement);
+  const cssVars = [
+    "--chat-bg",
+    "--my-bubble",
+    "--their-bubble",
+    "--ink",
+    "--muted",
+    "--line",
+    "--brand",
+    "--brand-dark",
+    "--accent",
+    "--shadow"
+  ]
+    .map((name) => `${name}:${rootStyles.getPropertyValue(name)};`)
+    .join("");
+  const markup = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width * scale}" height="${height * scale}" viewBox="0 0 ${width} ${height}">
+      <foreignObject width="100%" height="100%">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="${cssVars}">
+          <style>${cssText}</style>
+          ${clone.outerHTML}
+        </div>
+      </foreignObject>
+    </svg>
+  `;
+  const svgUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
+  const image = await loadImage(svgUrl);
+  const canvas = document.createElement("canvas");
+  canvas.width = width * scale;
+  canvas.height = height * scale;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+function inlineComputedStyles(source, clone) {
+  const sourceElements = [source, ...source.querySelectorAll("*")];
+  const cloneElements = [clone, ...clone.querySelectorAll("*")];
+  sourceElements.forEach((sourceElement, index) => {
+    const cloneElement = cloneElements[index];
+    if (!cloneElement) return;
+    const computed = getComputedStyle(sourceElement);
+    let css = "";
+    for (const property of computed) {
+      css += `${property}:${computed.getPropertyValue(property)};`;
+    }
+    cloneElement.setAttribute("style", `${css}${cloneElement.getAttribute("style") || ""}`);
+  });
+}
+
+function preserveScrollPosition(originalStream, clonedStream) {
+  if (!originalStream.scrollTop) return;
+  const computed = getComputedStyle(originalStream);
+  const wrapper = document.createElement("div");
+  wrapper.style.display = "flex";
+  wrapper.style.flexDirection = "column";
+  wrapper.style.gap = computed.gap;
+  wrapper.style.width = "100%";
+  wrapper.style.transform = `translateY(-${originalStream.scrollTop}px)`;
+  wrapper.style.transformOrigin = "top left";
+  while (clonedStream.firstChild) {
+    wrapper.append(clonedStream.firstChild);
+  }
+  clonedStream.style.display = "block";
+  clonedStream.style.overflow = "hidden";
+  clonedStream.append(wrapper);
+}
+
+function collectSameOriginCss() {
+  return [...document.styleSheets]
+    .map((sheet) => {
+      try {
+        return [...sheet.cssRules].map((rule) => rule.cssText).join("\n");
+      } catch {
+        return "";
+      }
+    })
+    .join("\n");
+}
+
+async function renderTalkToCanvasManual() {
+  const previewRect = elements.phoneScreen.getBoundingClientRect();
+  const width = Math.max(320, Math.round(previewRect.width || 390));
+  const height = Math.max(600, Math.round(previewRect.height || 760));
   const scale = 2;
   const canvas = document.createElement("canvas");
   canvas.width = width * scale;
@@ -575,7 +709,7 @@ async function renderTalkToCanvas() {
     drawComposer(ctx, width, height);
   }
 
-  const chatTop = state.showOuterFrame ? 118 : 0;
+  const chatTop = state.showOuterFrame ? 106 : 0;
   const chatBottom = state.showOuterFrame ? height - 66 : height;
   ctx.save();
   ctx.beginPath();
@@ -723,9 +857,9 @@ function drawStatusAndHeader(ctx, width, avatarImage) {
   ctx.textAlign = "left";
 
   ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 42, width, 76);
+  ctx.fillRect(0, 42, width, 64);
   ctx.fillStyle = "rgba(0, 0, 0, 0.08)";
-  ctx.fillRect(0, 117, width, 1);
+  ctx.fillRect(0, 105, width, 1);
   ctx.fillStyle = "#26302f";
   ctx.font = "500 24px 'Yu Gothic', Meiryo, sans-serif";
   ctx.fillText("‹", 22, 73);
@@ -733,9 +867,9 @@ function drawStatusAndHeader(ctx, width, avatarImage) {
 
   const nameX = state.showAvatar ? 92 : 58;
   if (state.showAvatar) {
-    drawAvatar(ctx, avatarImage, 74, 80, 17);
+    drawAvatar(ctx, avatarImage, 74, 74, 17);
   }
-  drawHeaderTitle(ctx, state.partnerName, nameX, 78, width - nameX - 128);
+  drawHeaderTitle(ctx, state.partnerName, nameX, 72, width - nameX - 128);
   ctx.textAlign = "right";
   ctx.fillStyle = "#111414";
   ctx.font = "700 20px 'Yu Gothic', Meiryo, sans-serif";
@@ -787,8 +921,8 @@ function drawMessages(ctx, width, chatTop, chatBottom, avatarImage, uploadIconIm
 
 function measureMessageBlock(ctx, message, width, imageCache) {
   if (message.type === "image") {
-    const avatarSpace = message.sender === "them" && state.showAvatar ? 54 : 0;
-    const maxImageWidth = width - 24 - avatarSpace;
+    const avatarSpace = message.sender === "them" && state.showAvatar ? talkMetrics.avatarSize + talkMetrics.avatarGap : 0;
+    const maxImageWidth = width - talkMetrics.sidePad - talkMetrics.rightPad - avatarSpace - talkMetrics.metaWidth - talkMetrics.metaGap;
     const imageWidth = Math.min(message.sender === "them" ? 250 : 270, maxImageWidth);
     const img = imageCache.get(message.imageSrc);
     const ratio = img?.naturalWidth && img?.naturalHeight ? img.naturalHeight / img.naturalWidth : 0.72;
@@ -796,30 +930,37 @@ function measureMessageBlock(ctx, message, width, imageCache) {
     return { bubbleWidth: imageWidth, bubbleHeight: imageHeight, height: imageHeight, lines: [] };
   }
 
-  ctx.font = "400 14px 'Yu Gothic', Meiryo, sans-serif";
-  const maxTextWidth = message.sender === "them" ? 230 : 225;
+  ctx.font = `${talkMetrics.textFontSize}px 'Yu Gothic', Meiryo, sans-serif`;
+  const avatarSpace = message.sender === "them" && state.showAvatar ? talkMetrics.avatarSize + talkMetrics.avatarGap : 0;
+  const availableBubbleWidth =
+    width - talkMetrics.sidePad - talkMetrics.rightPad - avatarSpace - talkMetrics.metaWidth - talkMetrics.metaGap;
+  const maxBubbleWidth = Math.min(
+    message.sender === "them" ? talkMetrics.maxTheirBubbleWidth : talkMetrics.maxMyBubbleWidth,
+    availableBubbleWidth
+  );
+  const maxTextWidth = maxBubbleWidth - talkMetrics.textPadX * 2;
   const lines = wrapText(ctx, message.text || "", maxTextWidth);
   const textWidth = Math.max(42, ...lines.map((line) => ctx.measureText(line).width));
-  const bubbleWidth = Math.min(maxTextWidth + 22, Math.ceil(textWidth + 22));
-  const bubbleHeight = lines.length * 20 + 18;
+  const bubbleWidth = Math.min(maxBubbleWidth, Math.ceil(textWidth + talkMetrics.textPadX * 2));
+  const bubbleHeight = lines.length * talkMetrics.textLineHeight + talkMetrics.textPadY * 2;
   return { bubbleWidth, bubbleHeight, height: Math.max(36, bubbleHeight), lines };
 }
 
 function drawMessageBlock(ctx, message, block, width, y, avatarImage, uploadIconImage, imageCache) {
-  const metaWidth = 35;
-  const gap = 6;
+  const metaWidth = talkMetrics.metaWidth;
+  const gap = talkMetrics.metaGap;
   let bubbleX;
   let metaX;
 
   if (message.sender === "me") {
-    bubbleX = width - 12 - block.bubbleWidth;
+    bubbleX = width - talkMetrics.rightPad - talkMetrics.tailWidth - block.bubbleWidth;
     metaX = bubbleX - gap - metaWidth;
   } else {
-    const avatarSpace = state.showAvatar ? 54 : 0;
-    bubbleX = 12 + avatarSpace;
+    const avatarSpace = state.showAvatar ? talkMetrics.avatarSize + talkMetrics.avatarGap : 0;
+    bubbleX = (state.showAvatar ? talkMetrics.sidePad : talkMetrics.sidePad + talkMetrics.tailWidth) + avatarSpace;
     metaX = bubbleX + block.bubbleWidth + gap;
     if (state.showAvatar) {
-      drawAvatar(ctx, avatarImage, 30, y + 18, 18);
+      drawAvatar(ctx, avatarImage, talkMetrics.sidePad + talkMetrics.avatarSize / 2, y + talkMetrics.avatarSize / 2, talkMetrics.avatarSize / 2);
     }
   }
 
@@ -834,11 +975,18 @@ function drawMessageBlock(ctx, message, block, width, y, avatarImage, uploadIcon
     drawImageMeta(ctx, message, bubbleX, y, block.bubbleWidth, block.bubbleHeight);
     return;
   } else {
-    const radius = { tl: 16, tr: 16, br: message.sender === "me" ? 4 : 16, bl: message.sender === "them" ? 4 : 16 };
+    const radius = {
+      tl: talkMetrics.bubbleRadius,
+      tr: talkMetrics.bubbleRadius,
+      br: talkMetrics.bubbleRadius,
+      bl: talkMetrics.bubbleRadius
+    };
     if (message.sender === "them") {
+      radius.tl = 3;
       drawTheirTail(ctx, bubbleX, y);
-      radius.tl = 4;
-      radius.bl = 16;
+    } else {
+      radius.tr = 3;
+      drawMyTail(ctx, bubbleX + block.bubbleWidth, y);
     }
     drawVariableRoundedRect(
       ctx,
@@ -850,13 +998,13 @@ function drawMessageBlock(ctx, message, block, width, y, avatarImage, uploadIcon
       message.sender === "me" ? "#8ee86c" : "#ffffff"
     );
     ctx.fillStyle = "#171c1c";
-    ctx.font = "400 14px 'Yu Gothic', Meiryo, sans-serif";
+    ctx.font = `${talkMetrics.textFontSize}px 'Yu Gothic', Meiryo, sans-serif`;
     block.lines.forEach((line, index) => {
-      ctx.fillText(line, bubbleX + 11, y + 9 + index * 20);
+      ctx.fillText(line, bubbleX + talkMetrics.textPadX, y + talkMetrics.textPadY + index * talkMetrics.textLineHeight);
     });
   }
 
-  drawMeta(ctx, message, metaX, y + block.bubbleHeight - (message.read ? 25 : 13));
+  drawMeta(ctx, message, metaX, y + block.bubbleHeight - (message.read ? 29 : 17));
 }
 
 function drawUploadIcon(ctx, image, centerX, centerY) {
@@ -893,9 +1041,29 @@ function drawTheirTail(ctx, x, y) {
   ctx.save();
   ctx.fillStyle = "#ffffff";
   ctx.beginPath();
-  ctx.moveTo(x + 1, y + 2);
-  ctx.lineTo(x - 7, y + 2);
-  ctx.lineTo(x + 1, y + 12);
+  ctx.moveTo(x + 7, y - 1);
+  ctx.lineTo(x - 4, y - 1);
+  ctx.quadraticCurveTo(x - 7, y - 1, x - 9, y - 5);
+  ctx.lineTo(x - 11, y - 9);
+  ctx.quadraticCurveTo(x - 8, y + 1, x - 4, y + 6);
+  ctx.quadraticCurveTo(x - 2, y + 8, x - 2, y + 13);
+  ctx.lineTo(x + 7, y + 13);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawMyTail(ctx, x, y) {
+  ctx.save();
+  ctx.fillStyle = "#8ee86c";
+  ctx.beginPath();
+  ctx.moveTo(x - 7, y - 1);
+  ctx.lineTo(x + 4, y - 1);
+  ctx.quadraticCurveTo(x + 7, y - 1, x + 9, y - 5);
+  ctx.lineTo(x + 11, y - 9);
+  ctx.quadraticCurveTo(x + 8, y + 1, x + 4, y + 6);
+  ctx.quadraticCurveTo(x + 2, y + 8, x + 2, y + 13);
+  ctx.lineTo(x - 7, y + 13);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
@@ -908,43 +1076,39 @@ function drawImageMeta(ctx, message, x, y, width, height) {
   }
   lines.push(formatTime(message.time));
 
-  ctx.font = "700 10px 'Yu Gothic', Meiryo, sans-serif";
-  ctx.fillStyle = "#f5f7f6";
-  ctx.shadowColor = "rgba(0, 0, 0, 0.22)";
-  ctx.shadowBlur = 4;
+  ctx.font = `500 ${talkMetrics.metaFontSize}px 'Yu Gothic', Meiryo, sans-serif`;
+  ctx.fillStyle = "rgba(48, 52, 60, 0.78)";
+  ctx.shadowBlur = 0;
   const textX = message.sender === "me" ? x - 6 : x + width + 6;
-  const textY = y + height - lines.length * 12 - 3;
+  const textY = y + height - lines.length * talkMetrics.metaLineHeight - 7;
   ctx.textAlign = message.sender === "me" ? "right" : "left";
   lines.forEach((line, index) => {
-    ctx.fillText(line, textX, textY + index * 12);
+    ctx.fillText(line, textX, textY + index * talkMetrics.metaLineHeight);
   });
-  ctx.shadowBlur = 0;
   ctx.textAlign = "left";
 }
 
 function drawMeta(ctx, message, x, y) {
-  ctx.fillStyle = "#f5f7f6";
-  ctx.shadowColor = "rgba(0, 0, 0, 0.22)";
-  ctx.shadowBlur = 4;
-  ctx.font = "700 10px 'Yu Gothic', Meiryo, sans-serif";
+  ctx.fillStyle = "rgba(48, 52, 60, 0.78)";
+  ctx.shadowBlur = 0;
+  ctx.font = `500 ${talkMetrics.metaFontSize}px 'Yu Gothic', Meiryo, sans-serif`;
   if (message.sender === "me") {
     ctx.textAlign = "right";
     if (message.read) {
-      ctx.fillText("既読", x + 35, y);
-      ctx.fillText(formatTime(message.time), x + 35, y + 12);
+      ctx.fillText("既読", x + talkMetrics.metaWidth, y);
+      ctx.fillText(formatTime(message.time), x + talkMetrics.metaWidth, y + talkMetrics.metaLineHeight);
     } else {
-      ctx.fillText(formatTime(message.time), x + 35, y + 12);
+      ctx.fillText(formatTime(message.time), x + talkMetrics.metaWidth, y);
     }
   } else {
     ctx.textAlign = "left";
     if (message.read) {
       ctx.fillText("既読", x, y);
-      ctx.fillText(formatTime(message.time), x, y + 12);
+      ctx.fillText(formatTime(message.time), x, y + talkMetrics.metaLineHeight);
     } else {
-      ctx.fillText(formatTime(message.time), x, y + 12);
+      ctx.fillText(formatTime(message.time), x, y);
     }
   }
-  ctx.shadowBlur = 0;
   ctx.textAlign = "left";
 }
 
