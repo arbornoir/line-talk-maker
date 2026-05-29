@@ -30,6 +30,7 @@ const talkMetrics = {
   maxTheirBubbleWidth: 278,
   maxMyBubbleWidth: 270
 };
+const textMeasureContext = document.createElement("canvas").getContext("2d");
 
 const state = {
   partnerName: "佐藤さん",
@@ -281,7 +282,9 @@ function renderChat() {
       img.alt = "送信画像";
       bubble.append(img);
     } else {
-      bubble.textContent = message.text;
+      const layout = getBubbleTextLayout(message.text || "", message.sender);
+      bubble.textContent = layout.text;
+      bubble.style.width = `${layout.bubbleWidth}px`;
     }
 
     const meta = document.createElement("div");
@@ -1244,22 +1247,126 @@ function drawVariableRoundedRect(ctx, x, y, width, height, radius, fill) {
   ctx.fill();
 }
 
+function getBubbleTextLayout(text, sender, maxTextWidth = getPreviewTextWidth(sender)) {
+  textMeasureContext.font = `${talkMetrics.textFontSize}px 'Yu Gothic', Meiryo, sans-serif`;
+  const lines = wrapText(textMeasureContext, text, maxTextWidth);
+  const textWidth = Math.max(42, ...lines.map((line) => textMeasureContext.measureText(line).width));
+  return {
+    text: lines.join("\n"),
+    bubbleWidth: Math.ceil(textWidth + talkMetrics.textPadX * 2)
+  };
+}
+
+function getPreviewTextWidth(sender) {
+  const phoneWidth = elements.phoneScreen?.getBoundingClientRect().width || 390;
+  const avatarSpace = sender === "them" && state.showAvatar ? talkMetrics.avatarSize + talkMetrics.avatarGap : 0;
+  const availableBubbleWidth =
+    phoneWidth -
+    talkMetrics.sidePad -
+    talkMetrics.rightPad -
+    talkMetrics.tailWidth -
+    avatarSpace -
+    talkMetrics.metaWidth -
+    talkMetrics.metaGap;
+  const maxBubbleWidth = Math.min(
+    sender === "them" ? talkMetrics.maxTheirBubbleWidth : talkMetrics.maxMyBubbleWidth,
+    availableBubbleWidth
+  );
+  return Math.max(80, maxBubbleWidth - talkMetrics.textPadX * 2);
+}
+
 function wrapText(ctx, text, maxWidth) {
   const lines = [];
   for (const paragraph of String(text).split("\n")) {
-    let line = "";
-    for (const char of [...paragraph]) {
-      const next = line + char;
-      if (line && ctx.measureText(next).width > maxWidth) {
-        lines.push(line);
-        line = char;
-      } else {
-        line = next;
-      }
-    }
-    lines.push(line);
+    lines.push(...wrapParagraphBalanced(ctx, paragraph, maxWidth));
   }
   return lines.length ? lines : [""];
+}
+
+function wrapParagraphBalanced(ctx, paragraph, maxWidth) {
+  const chars = [...paragraph];
+  if (!chars.length) return [""];
+
+  const greedyLines = wrapParagraphGreedy(ctx, chars, maxWidth);
+  if (greedyLines.length <= 1 || chars.length > 120) return greedyLines;
+
+  const balanced = balanceParagraphLines(ctx, chars, maxWidth, greedyLines.length);
+  return balanced || greedyLines;
+}
+
+function wrapParagraphGreedy(ctx, chars, maxWidth) {
+  const lines = [];
+  let line = "";
+  for (const char of chars) {
+    const next = line + char;
+    if (line && ctx.measureText(next).width > maxWidth) {
+      lines.push(line);
+      line = char;
+    } else {
+      line = next;
+    }
+  }
+  lines.push(line);
+  return lines;
+}
+
+function balanceParagraphLines(ctx, chars, maxWidth, lineCount) {
+  const widthCache = new Map();
+  const textCache = new Map();
+  const totalWidth = measureSlice(ctx, chars, 0, chars.length, widthCache, textCache);
+  const targetWidth = totalWidth / lineCount;
+  const memo = new Map();
+
+  function solve(start, remaining) {
+    const key = `${start}:${remaining}`;
+    if (memo.has(key)) return memo.get(key);
+
+    const charsLeft = chars.length - start;
+    if (remaining === 1) {
+      const width = measureSlice(ctx, chars, start, chars.length, widthCache, textCache);
+      const result =
+        width <= maxWidth || charsLeft === 1
+          ? { lines: [sliceText(chars, start, chars.length, textCache)], widths: [width] }
+          : null;
+      memo.set(key, result);
+      return result;
+    }
+
+    let best = null;
+    const maxEnd = chars.length - remaining + 1;
+    for (let end = start + 1; end <= maxEnd; end += 1) {
+      const width = measureSlice(ctx, chars, start, end, widthCache, textCache);
+      if (width > maxWidth && end > start + 1) break;
+
+      const rest = solve(end, remaining - 1);
+      if (!rest) continue;
+
+      const lines = [sliceText(chars, start, end, textCache), ...rest.lines];
+      const widths = [width, ...rest.widths];
+      const maxLineWidth = Math.max(...widths);
+      const balancePenalty = widths.reduce((sum, item) => sum + Math.abs(item - targetWidth), 0);
+      const shortLastPenalty = Math.max(0, targetWidth * 0.45 - widths[widths.length - 1]) * 4;
+      const score = maxLineWidth * 1000 + balancePenalty + shortLastPenalty;
+      if (!best || score < best.score) best = { lines, widths, score };
+    }
+
+    memo.set(key, best);
+    return best;
+  }
+
+  return solve(0, lineCount)?.lines || null;
+}
+
+function measureSlice(ctx, chars, start, end, widthCache, textCache) {
+  const text = sliceText(chars, start, end, textCache);
+  if (!widthCache.has(text)) widthCache.set(text, ctx.measureText(text).width);
+  return widthCache.get(text);
+}
+
+function sliceText(chars, start, end, textCache) {
+  const key = `${start}:${end}`;
+  if (!textCache.has(key)) textCache.set(key, chars.slice(start, end).join(""));
+  return textCache.get(key);
 }
 
 function loadImage(src) {

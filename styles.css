@@ -643,6 +643,7 @@ input[type="file"] {
   color: #171c1c;
   line-height: 1.28;
   font-size: 1.12rem;
+  text-wrap: balance;
   white-space: pre-wrap;
 }
 
