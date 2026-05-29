@@ -4,12 +4,23 @@ const defaultDate = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(t
 const demoImageSrc =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 460'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='1'%3E%3Cstop stop-color='%23ffe08a'/%3E%3Cstop offset='.52' stop-color='%23ff7a59'/%3E%3Cstop offset='1' stop-color='%2306c755'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='640' height='460' rx='34' fill='url(%23g)'/%3E%3Ccircle cx='500' cy='100' r='70' fill='rgba(255,255,255,.42)'/%3E%3Cpath d='M70 345 235 190l105 98 75-70 155 127z' fill='rgba(255,255,255,.78)'/%3E%3Ctext x='54' y='72' fill='white' font-family='Arial,sans-serif' font-size='42' font-weight='700'%3EImage message%3C/text%3E%3C/svg%3E";
 const uploadIconSrc = "./upload-icon.png";
+const backgroundColors = {
+  blue: "#8fa8c6",
+  pink: "#efb4c7",
+  image: "#dbe8f1"
+};
+const chatTopPadding = 24;
 
 const state = {
   partnerName: "佐藤さん",
   date: defaultDate,
   defaultTime: "14:20",
-  showAvatar: true,
+  showAvatar: false,
+  showInitialDate: true,
+  showOuterFrame: false,
+  backgroundColor: "blue",
+  decorationTheme: "none",
+  backgroundImageSrc: "",
   avatarSrc: "",
   editId: null,
   draftImageSrc: "",
@@ -49,7 +60,13 @@ const elements = {
   defaultTimeInput: document.querySelector("#defaultTimeInput"),
   partnerNameInput: document.querySelector("#partnerNameInput"),
   showAvatarInput: document.querySelector("#showAvatarInput"),
+  showInitialDateInput: document.querySelector("#showInitialDateInput"),
+  showOuterFrameInput: document.querySelector("#showOuterFrameInput"),
   avatarInput: document.querySelector("#avatarInput"),
+  backgroundImageInput: document.querySelector("#backgroundImageInput"),
+  backgroundImageField: document.querySelector("#backgroundImageField"),
+  phoneScreen: document.querySelector(".phone-screen"),
+  talkHeader: document.querySelector(".talk-header"),
   headerAvatar: document.querySelector("#headerAvatar"),
   headerName: document.querySelector("#headerName"),
   statusTime: document.querySelector("#statusTime"),
@@ -58,18 +75,23 @@ const elements = {
   messageForm: document.querySelector("#messageForm"),
   messageTextInput: document.querySelector("#messageTextInput"),
   messageTimeInput: document.querySelector("#messageTimeInput"),
+  messageDateInput: document.querySelector("#messageDateInput"),
   messageImageInput: document.querySelector("#messageImageInput"),
   imagePreviewWrap: document.querySelector("#imagePreviewWrap"),
   imagePreview: document.querySelector("#imagePreview"),
+  senderFieldset: document.querySelector("#senderFieldset"),
+  messageMetaControls: document.querySelector("#messageMetaControls"),
   textField: document.querySelector("#textField"),
   imageField: document.querySelector("#imageField"),
+  dateField: document.querySelector("#dateField"),
   readInput: document.querySelector("#readInput"),
   submitMessageButton: document.querySelector("#submitMessageButton"),
   cancelEditButton: document.querySelector("#cancelEditButton"),
   editHint: document.querySelector("#editHint"),
   resetButton: document.querySelector("#resetButton"),
   clearButton: document.querySelector("#clearButton"),
-  downloadButton: document.querySelector("#downloadButton")
+  downloadButton: document.querySelector("#downloadButton"),
+  swapRolesButton: document.querySelector("#swapRolesButton")
 };
 
 function init() {
@@ -77,7 +99,10 @@ function init() {
   elements.defaultTimeInput.value = state.defaultTime;
   elements.partnerNameInput.value = state.partnerName;
   elements.showAvatarInput.checked = state.showAvatar;
-  elements.messageTimeInput.value = state.defaultTime;
+  elements.showInitialDateInput.checked = state.showInitialDate;
+  elements.showOuterFrameInput.checked = state.showOuterFrame;
+  elements.messageTimeInput.value = getLastMessageTime() || state.defaultTime;
+  elements.messageDateInput.value = state.date;
   bindEvents();
   render();
 }
@@ -90,7 +115,7 @@ function bindEvents() {
 
   elements.defaultTimeInput.addEventListener("input", (event) => {
     state.defaultTime = event.target.value || state.defaultTime;
-    elements.messageTimeInput.value = state.defaultTime;
+    elements.messageTimeInput.value = getChronologicalTime(state.defaultTime, state.editId);
     render();
   });
 
@@ -101,6 +126,16 @@ function bindEvents() {
 
   elements.showAvatarInput.addEventListener("change", (event) => {
     state.showAvatar = event.target.checked;
+    render();
+  });
+
+  elements.showInitialDateInput.addEventListener("change", (event) => {
+    state.showInitialDate = event.target.checked;
+    render();
+  });
+
+  elements.showOuterFrameInput.addEventListener("change", (event) => {
+    state.showOuterFrame = event.target.checked;
     render();
   });
 
@@ -117,6 +152,33 @@ function bindEvents() {
 
   document.querySelectorAll("input[name='sender']").forEach((input) => {
     input.addEventListener("change", handleSenderChange);
+  });
+
+  elements.messageTimeInput.addEventListener("change", () => {
+    elements.messageTimeInput.value = getChronologicalTime(elements.messageTimeInput.value, state.editId);
+  });
+
+  document.querySelectorAll("input[name='backgroundColor']").forEach((input) => {
+    input.addEventListener("change", (event) => {
+      state.backgroundColor = event.target.value;
+      render();
+    });
+  });
+
+  document.querySelectorAll("input[name='decorationTheme']").forEach((input) => {
+    input.addEventListener("change", (event) => {
+      state.decorationTheme = event.target.value;
+      render();
+    });
+  });
+
+  elements.backgroundImageInput.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    state.backgroundImageSrc = await readFileAsDataUrl(file);
+    state.backgroundColor = "image";
+    document.querySelector("input[name='backgroundColor'][value='image']").checked = true;
+    render();
   });
 
   elements.messageImageInput.addEventListener("change", async (event) => {
@@ -136,23 +198,26 @@ function bindEvents() {
     render();
   });
   elements.downloadButton.addEventListener("click", downloadTalkPng);
+  elements.swapRolesButton.addEventListener("click", swapRoles);
 }
 
 function render() {
+  applyBackground();
   elements.headerName.textContent = state.partnerName;
   elements.statusTime.textContent = formatTime(state.defaultTime);
   elements.headerAvatar.style.backgroundImage = state.avatarSrc ? `url("${state.avatarSrc}")` : "";
   elements.headerAvatar.classList.toggle("hidden", !state.showAvatar);
+  elements.talkHeader.classList.toggle("avatar-hidden", !state.showAvatar);
+  elements.phoneScreen.classList.toggle("outer-hidden", !state.showOuterFrame);
   renderChat();
   renderMessageList();
 }
 
 function renderChat() {
   elements.chatStream.innerHTML = "";
-  const dateChip = document.createElement("div");
-  dateChip.className = "date-chip";
-  dateChip.textContent = formatDate(state.date);
-  elements.chatStream.append(dateChip);
+  if (state.showInitialDate) {
+    elements.chatStream.append(makeDateChip(formatDate(state.date)));
+  }
 
   if (state.messages.length === 0) {
     const empty = document.createElement("div");
@@ -163,6 +228,11 @@ function renderChat() {
   }
 
   state.messages.forEach((message) => {
+    if (message.type === "date") {
+      elements.chatStream.append(makeDateChip(formatDate(message.date)));
+      return;
+    }
+
     const row = document.createElement("article");
     row.className = `message-row ${message.sender} ${message.type}`;
     row.classList.toggle("avatar-hidden", message.sender === "them" && !state.showAvatar);
@@ -196,7 +266,7 @@ function renderChat() {
 
     const meta = document.createElement("div");
     meta.className = "meta";
-    if (message.sender === "me" && message.read) {
+    if (message.read) {
       const read = document.createElement("span");
       read.textContent = "既読";
       meta.append(read);
@@ -209,6 +279,13 @@ function renderChat() {
     row.append(wrap);
     elements.chatStream.append(row);
   });
+}
+
+function makeDateChip(text) {
+  const dateChip = document.createElement("div");
+  dateChip.className = "date-chip";
+  dateChip.textContent = text;
+  return dateChip;
 }
 
 function renderMessageList() {
@@ -227,9 +304,13 @@ function renderMessageList() {
 
     const detail = document.createElement("div");
     const title = document.createElement("strong");
-    title.textContent = `${index + 1}. ${message.sender === "me" ? "自分" : "相手"} / ${formatTime(message.time)}`;
+    title.textContent =
+      message.type === "date"
+        ? `${index + 1}. 日付`
+        : `${index + 1}. ${message.sender === "me" ? "自分" : "相手"} / ${formatTime(message.time)}`;
     const summary = document.createElement("span");
-    summary.textContent = message.type === "image" ? "画像メッセージ" : message.text;
+    summary.textContent =
+      message.type === "date" ? formatDate(message.date) : message.type === "image" ? "画像メッセージ" : message.text;
     detail.append(title, summary);
 
     const actions = document.createElement("div");
@@ -261,8 +342,29 @@ function handleMessageSubmit(event) {
   event.preventDefault();
   const sender = document.querySelector("input[name='sender']:checked").value;
   const type = document.querySelector("input[name='messageType']:checked").value;
-  const time = elements.messageTimeInput.value || state.defaultTime;
+  const time = getChronologicalTime(elements.messageTimeInput.value || state.defaultTime, state.editId);
   const text = elements.messageTextInput.value.trim();
+
+  if (type === "date") {
+    const payload = {
+      id: state.editId || crypto.randomUUID(),
+      type: "date",
+      date: elements.messageDateInput.value || state.date
+    };
+
+    if (state.editId) {
+      state.messages = state.messages.map((message) => (message.id === state.editId ? payload : message));
+    } else {
+      state.messages.push(payload);
+    }
+
+    clearEditor();
+    render();
+    requestAnimationFrame(() => {
+      elements.chatStream.scrollTop = elements.chatStream.scrollHeight;
+    });
+    return;
+  }
 
   if (type === "text" && !text) {
     elements.messageTextInput.focus();
@@ -280,7 +382,7 @@ function handleMessageSubmit(event) {
     type,
     text,
     time,
-    read: sender === "me" ? elements.readInput.checked : false,
+    read: elements.readInput.checked,
     imageSrc: type === "image" ? state.draftImageSrc : ""
   };
 
@@ -302,10 +404,13 @@ function editMessage(id) {
   if (!message) return;
   state.editId = id;
 
-  document.querySelector(`input[name='sender'][value='${message.sender}']`).checked = true;
   document.querySelector(`input[name='messageType'][value='${message.type}']`).checked = true;
+  if (message.type !== "date") {
+    document.querySelector(`input[name='sender'][value='${message.sender}']`).checked = true;
+  }
   elements.messageTextInput.value = message.text || "";
   elements.messageTimeInput.value = message.time || state.defaultTime;
+  elements.messageDateInput.value = message.date || state.date;
   elements.readInput.checked = Boolean(message.read);
   state.draftImageSrc = message.imageSrc || "";
 
@@ -326,6 +431,7 @@ function editMessage(id) {
 function deleteMessage(id) {
   state.messages = state.messages.filter((message) => message.id !== id);
   if (state.editId === id) clearEditor();
+  if (!state.editId) elements.messageTimeInput.value = getLastMessageTime() || state.defaultTime;
   render();
 }
 
@@ -335,6 +441,7 @@ function moveMessage(index, direction) {
   const copy = [...state.messages];
   [copy[index], copy[nextIndex]] = [copy[nextIndex], copy[index]];
   state.messages = copy;
+  if (!state.editId) elements.messageTimeInput.value = getLastMessageTime() || state.defaultTime;
   render();
 }
 
@@ -343,7 +450,8 @@ function clearEditor() {
   state.draftImageSrc = "";
   elements.messageTextInput.value = "";
   elements.messageImageInput.value = "";
-  elements.messageTimeInput.value = state.defaultTime;
+  elements.messageTimeInput.value = getLastMessageTime() || state.defaultTime;
+  elements.messageDateInput.value = state.date;
   elements.readInput.checked = true;
   document.querySelector("input[name='sender'][value='me']").checked = true;
   document.querySelector("input[name='messageType'][value='text']").checked = true;
@@ -359,15 +467,46 @@ function resetAll() {
   state.partnerName = "佐藤さん";
   state.date = defaultDate;
   state.defaultTime = "14:20";
-  state.showAvatar = true;
+  state.showAvatar = false;
+  state.showInitialDate = true;
+  state.showOuterFrame = false;
+  state.backgroundColor = "blue";
+  state.decorationTheme = "none";
+  state.backgroundImageSrc = "";
   state.avatarSrc = "";
   state.messages = [];
   elements.avatarInput.value = "";
+  elements.backgroundImageInput.value = "";
   elements.partnerNameInput.value = state.partnerName;
   elements.dateInput.value = state.date;
   elements.defaultTimeInput.value = state.defaultTime;
   elements.showAvatarInput.checked = state.showAvatar;
+  elements.showInitialDateInput.checked = state.showInitialDate;
+  elements.showOuterFrameInput.checked = state.showOuterFrame;
+  document.querySelector("input[name='backgroundColor'][value='blue']").checked = true;
+  document.querySelector("input[name='decorationTheme'][value='none']").checked = true;
   clearEditor();
+  render();
+}
+
+function swapRoles() {
+  state.messages = state.messages.map((message) =>
+    message.type === "date"
+      ? message
+      : {
+          ...message,
+          sender: message.sender === "me" ? "them" : "me"
+        }
+  );
+
+  if (state.editId) {
+    const editedMessage = state.messages.find((message) => message.id === state.editId);
+    if (editedMessage && editedMessage.type !== "date") {
+      document.querySelector(`input[name='sender'][value='${editedMessage.sender}']`).checked = true;
+      syncReadAvailability();
+    }
+  }
+
   render();
 }
 
@@ -375,6 +514,9 @@ function renderMessageTypeFields() {
   const type = document.querySelector("input[name='messageType']:checked").value;
   elements.textField.classList.toggle("hidden", type !== "text");
   elements.imageField.classList.toggle("hidden", type !== "image");
+  elements.dateField.classList.toggle("hidden", type !== "date");
+  elements.senderFieldset.classList.toggle("hidden", type === "date");
+  elements.messageMetaControls.classList.toggle("hidden", type === "date");
   elements.imagePreviewWrap.classList.toggle("hidden", type !== "image" || !state.draftImageSrc);
 }
 
@@ -387,11 +529,8 @@ function handleSenderChange() {
 }
 
 function syncReadAvailability() {
-  const sender = document.querySelector("input[name='sender']:checked").value;
-  const isMe = sender === "me";
-  elements.readInput.disabled = !isMe;
-  elements.readInput.parentElement.style.opacity = isMe ? "1" : "0.48";
-  if (!isMe) elements.readInput.checked = false;
+  elements.readInput.disabled = false;
+  elements.readInput.parentElement.style.opacity = "1";
 }
 
 async function downloadTalkPng() {
@@ -422,6 +561,7 @@ async function renderTalkToCanvas() {
 
   const avatarImage = state.avatarSrc ? await loadImage(state.avatarSrc).catch(() => null) : null;
   const uploadIconImage = await loadImage(uploadIconSrc).catch(() => null);
+  const backgroundImage = state.backgroundImageSrc ? await loadImage(state.backgroundImageSrc).catch(() => null) : null;
   const imageCache = new Map();
   for (const message of state.messages) {
     if (message.type === "image" && message.imageSrc && !imageCache.has(message.imageSrc)) {
@@ -429,12 +569,14 @@ async function renderTalkToCanvas() {
     }
   }
 
-  drawRoundedRect(ctx, 0, 0, width, height, 24, "#8fa8c6");
-  drawStatusAndHeader(ctx, width, avatarImage);
-  drawComposer(ctx, width, height);
+  drawChatBackground(ctx, width, height, backgroundImage);
+  if (state.showOuterFrame) {
+    drawStatusAndHeader(ctx, width, avatarImage);
+    drawComposer(ctx, width, height);
+  }
 
-  const chatTop = 90;
-  const chatBottom = height - 50;
+  const chatTop = state.showOuterFrame ? 118 : 0;
+  const chatBottom = state.showOuterFrame ? height - 66 : height;
   ctx.save();
   ctx.beginPath();
   ctx.rect(0, chatTop, width, chatBottom - chatTop);
@@ -445,40 +587,181 @@ async function renderTalkToCanvas() {
   return canvas;
 }
 
+function applyBackground() {
+  document.documentElement.style.setProperty("--chat-bg", getBackgroundColor());
+  const layers = [];
+  const decorationCss = getDecorationCss();
+  if (decorationCss) layers.push(decorationCss);
+  if (state.backgroundColor === "image" && state.backgroundImageSrc) {
+    layers.push(`url("${state.backgroundImageSrc}")`);
+  }
+
+  elements.phoneScreen.style.backgroundColor = getBackgroundColor();
+  elements.phoneScreen.style.backgroundImage = layers.join(", ");
+  elements.phoneScreen.style.backgroundPosition = layers.map(() => "center").join(", ");
+  elements.phoneScreen.style.backgroundRepeat = layers.map(() => "no-repeat").join(", ");
+  elements.phoneScreen.style.backgroundSize = layers
+    .map((_, index) => (decorationCss && index === 0 ? "390px 670px" : "cover"))
+    .join(", ");
+  elements.backgroundImageField.classList.toggle("hidden", state.backgroundColor !== "image");
+}
+
+function getBackgroundColor() {
+  return backgroundColors[state.backgroundColor] || backgroundColors.blue;
+}
+
+function getDecorationCss() {
+  if (state.decorationTheme === "decoDots") {
+    return [
+      "radial-gradient(circle at 12% 18%, rgba(255,255,255,.62) 0 15px, transparent 16px)",
+      "radial-gradient(circle at 82% 20%, rgba(255,255,255,.48) 0 25px, transparent 26px)",
+      "radial-gradient(circle at 20% 62%, rgba(255,230,242,.58) 0 19px, transparent 20px)",
+      "radial-gradient(circle at 74% 72%, rgba(255,255,255,.44) 0 18px, transparent 19px)",
+      "radial-gradient(circle at 46% 42%, rgba(255,255,255,.35) 0 10px, transparent 11px)"
+    ].join(", ");
+  }
+
+  if (state.decorationTheme === "decoClouds") {
+    return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 390 670'%3E%3Cg fill='white'%3E%3Cg opacity='.68'%3E%3Crect x='22' y='108' width='104' height='34' rx='17'/%3E%3Ccircle cx='48' cy='111' r='22'/%3E%3Ccircle cx='78' cy='96' r='29'/%3E%3Ccircle cx='108' cy='112' r='24'/%3E%3C/g%3E%3Cg opacity='.54'%3E%3Crect x='236' y='86' width='118' height='38' rx='19'/%3E%3Ccircle cx='265' cy='88' r='24'/%3E%3Ccircle cx='302' cy='70' r='32'/%3E%3Ccircle cx='336' cy='91' r='26'/%3E%3C/g%3E%3Cg opacity='.56'%3E%3Crect x='38' y='492' width='128' height='40' rx='20'/%3E%3Ccircle cx='70' cy='494' r='27'/%3E%3Ccircle cx='112' cy='474' r='35'/%3E%3Ccircle cx='149' cy='498' r='28'/%3E%3C/g%3E%3Cg opacity='.48'%3E%3Crect x='218' y='548' width='134' height='42' rx='21'/%3E%3Ccircle cx='251' cy='548' r='29'/%3E%3Ccircle cx='294' cy='525' r='37'/%3E%3Ccircle cx='333' cy='552' r='30'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`;
+  }
+
+  return "";
+}
+
+function drawChatBackground(ctx, width, height, backgroundImage) {
+  if (state.backgroundColor === "image" && backgroundImage) {
+    drawImageCover(ctx, backgroundImage, 0, 0, width, height, 24);
+  } else if (state.backgroundColor === "image") {
+    const gradient = ctx.createLinearGradient(0, 0, width, height);
+    gradient.addColorStop(0, "#dbe8f1");
+    gradient.addColorStop(1, "#a8bfd5");
+    drawRoundedRect(ctx, 0, 0, width, height, 24, gradient);
+  } else {
+    drawRoundedRect(ctx, 0, 0, width, height, 24, getBackgroundColor());
+  }
+
+  ctx.save();
+  drawRoundedPath(ctx, 0, 0, width, height, 24);
+  ctx.clip();
+  if (state.decorationTheme === "decoDots") {
+    drawBackgroundDots(ctx, width, height);
+  }
+
+  if (state.decorationTheme === "decoClouds") {
+    drawBackgroundClouds(ctx, width, height);
+  }
+  ctx.restore();
+}
+
+function drawBackgroundDots(ctx, width, height) {
+  ctx.save();
+  ctx.fillStyle = "rgba(255, 255, 255, 0.46)";
+  [
+    [46, 130, 16],
+    [330, 154, 24],
+    [76, 482, 20],
+    [296, 604, 18],
+    [184, 310, 12],
+    [236, 468, 10],
+    [128, 650, 14]
+  ].forEach(([x, y, radius]) => {
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.fillStyle = "rgba(255, 221, 238, 0.48)";
+  [
+    [102, 225, 12],
+    [332, 384, 15],
+    [238, 705, 10]
+  ].forEach(([x, y, radius]) => {
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.restore();
+}
+
+function drawBackgroundClouds(ctx, width, height) {
+  ctx.save();
+  [
+    [74, 122, 104, 56, 0.68],
+    [296, 101, 118, 62, 0.54],
+    [102, 510, 128, 68, 0.56],
+    [285, 568, 134, 72, 0.48],
+    [216, 360, 90, 48, 0.42]
+  ].forEach(([x, y, w, h, alpha]) => {
+    drawCloud(ctx, x, y, w, h, alpha);
+  });
+  ctx.restore();
+}
+
+function drawCloud(ctx, x, y, width, height, alpha = 0.56) {
+  const left = x - width / 2;
+  const baseTop = y + height * 0.2;
+  ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+  drawRoundedRect(ctx, left + width * 0.08, baseTop, width * 0.84, height * 0.42, height * 0.21, ctx.fillStyle);
+
+  ctx.beginPath();
+  ctx.arc(left + width * 0.27, baseTop + height * 0.02, height * 0.34, 0, Math.PI * 2);
+  ctx.arc(left + width * 0.56, y, height * 0.43, 0, Math.PI * 2);
+  ctx.arc(left + width * 0.82, baseTop + height * 0.03, height * 0.31, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 function drawStatusAndHeader(ctx, width, avatarImage) {
-  ctx.fillStyle = "rgba(242, 246, 247, 0.98)";
-  ctx.fillRect(0, 0, width, 36);
-  ctx.fillStyle = "#202526";
-  ctx.font = "700 12px 'Yu Gothic', Meiryo, sans-serif";
-  ctx.fillText(formatTime(state.defaultTime), 18, 11);
+  ctx.fillStyle = "#b9b9b9";
+  ctx.fillRect(0, 0, width, 42);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "800 14px 'Yu Gothic', Meiryo, sans-serif";
+  ctx.fillText(formatTime(state.defaultTime), 18, 12);
+  ctx.font = "700 11px 'Yu Gothic', Meiryo, sans-serif";
+  ctx.fillText("⌁ ✦ ♡ ✓", 82, 13);
   ctx.textAlign = "right";
-  ctx.fillText("5G 100%", width - 18, 11);
+  ctx.fillText("⌁ Wi-Fi 5G 96", width - 16, 13);
   ctx.textAlign = "left";
 
-  ctx.fillStyle = "rgba(248, 250, 250, 0.97)";
-  ctx.fillRect(0, 36, width, 54);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 42, width, 76);
   ctx.fillStyle = "rgba(0, 0, 0, 0.08)";
-  ctx.fillRect(0, 89, width, 1);
+  ctx.fillRect(0, 117, width, 1);
   ctx.fillStyle = "#26302f";
   ctx.font = "500 24px 'Yu Gothic', Meiryo, sans-serif";
-  ctx.fillText("‹", 24, 52);
-  ctx.font = "700 16px 'Yu Gothic', Meiryo, sans-serif";
+  ctx.fillText("‹", 22, 73);
+  ctx.font = "800 16px 'Yu Gothic', Meiryo, sans-serif";
 
-  const nameX = state.showAvatar ? 96 : 58;
+  const nameX = state.showAvatar ? 92 : 58;
   if (state.showAvatar) {
-    drawAvatar(ctx, avatarImage, 72, 63, 17);
+    drawAvatar(ctx, avatarImage, 74, 80, 17);
   }
-  ctx.fillText(state.partnerName, nameX, 55);
+  drawHeaderTitle(ctx, state.partnerName, nameX, 78, width - nameX - 128);
   ctx.textAlign = "right";
-  ctx.font = "700 18px 'Yu Gothic', Meiryo, sans-serif";
-  ctx.fillText("≡", width - 26, 54);
+  ctx.fillStyle = "#111414";
+  ctx.font = "700 20px 'Yu Gothic', Meiryo, sans-serif";
+  ctx.fillText("⌕", width - 90, 67);
+  ctx.fillText("▤", width - 54, 68);
+  ctx.fillText("≡", width - 18, 67);
   ctx.textAlign = "left";
+}
+
+function drawHeaderTitle(ctx, text, x, y, maxWidth) {
+  ctx.fillStyle = "#111414";
+  ctx.font = "800 16px 'Yu Gothic', Meiryo, sans-serif";
+  let title = text || "";
+  while (title.length > 0 && ctx.measureText(title).width > maxWidth) {
+    title = title.slice(0, -1);
+  }
+  if (title !== text) title = `${title}…`;
+  ctx.fillText(title, x, y);
 }
 
 function drawMessages(ctx, width, chatTop, chatBottom, avatarImage, uploadIconImage, imageCache) {
   const scrollOffset = elements.chatStream.scrollTop || 0;
-  let y = chatTop + 14 - scrollOffset;
-  y = drawDateChip(ctx, formatDate(state.date), width / 2, y) + 11;
+  let y = chatTop + chatTopPadding - scrollOffset;
+  if (state.showInitialDate) {
+    y = drawDateChip(ctx, formatDate(state.date), width / 2, y) + 11;
+  }
 
   if (state.messages.length === 0) {
     drawDateChip(ctx, "メッセージを追加してください", width / 2, y);
@@ -486,6 +769,14 @@ function drawMessages(ctx, width, chatTop, chatBottom, avatarImage, uploadIconIm
   }
 
   for (const message of state.messages) {
+    if (message.type === "date") {
+      if (y + 29 >= chatTop && y <= chatBottom) {
+        drawDateChip(ctx, formatDate(message.date), width / 2, y);
+      }
+      y += 39;
+      continue;
+    }
+
     const block = measureMessageBlock(ctx, message, width, imageCache);
     if (y + block.height >= chatTop && y <= chatBottom) {
       drawMessageBlock(ctx, message, block, width, y, avatarImage, uploadIconImage, imageCache);
@@ -565,7 +856,7 @@ function drawMessageBlock(ctx, message, block, width, y, avatarImage, uploadIcon
     });
   }
 
-  drawMeta(ctx, message, metaX, y + block.bubbleHeight - (message.read && message.sender === "me" ? 25 : 13));
+  drawMeta(ctx, message, metaX, y + block.bubbleHeight - (message.read ? 25 : 13));
 }
 
 function drawUploadIcon(ctx, image, centerX, centerY) {
@@ -612,7 +903,7 @@ function drawTheirTail(ctx, x, y) {
 
 function drawImageMeta(ctx, message, x, y, width, height) {
   const lines = [];
-  if (message.sender === "me" && message.read) {
+  if (message.read) {
     lines.push("既読");
   }
   lines.push(formatTime(message.time));
@@ -646,7 +937,12 @@ function drawMeta(ctx, message, x, y) {
     }
   } else {
     ctx.textAlign = "left";
-    ctx.fillText(formatTime(message.time), x, y + 12);
+    if (message.read) {
+      ctx.fillText("既読", x, y);
+      ctx.fillText(formatTime(message.time), x, y + 12);
+    } else {
+      ctx.fillText(formatTime(message.time), x, y + 12);
+    }
   }
   ctx.shadowBlur = 0;
   ctx.textAlign = "left";
@@ -664,18 +960,21 @@ function drawDateChip(ctx, text, centerX, y) {
 }
 
 function drawComposer(ctx, width, height) {
-  ctx.fillStyle = "rgba(249, 251, 251, 0.98)";
-  ctx.fillRect(0, height - 50, width, 50);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, height - 66, width, 66);
   ctx.fillStyle = "#26302f";
-  ctx.font = "400 22px 'Yu Gothic', Meiryo, sans-serif";
-  ctx.fillText("+", 20, height - 36);
-  drawRoundedRect(ctx, 52, height - 42, width - 104, 35, 18, "#eef3f1");
+  ctx.font = "400 24px 'Yu Gothic', Meiryo, sans-serif";
+  ctx.fillText("+", 18, height - 44);
+  ctx.fillText("▣", 55, height - 42);
+  ctx.fillText("▧", 92, height - 42);
+  drawRoundedRect(ctx, 128, height - 52, width - 178, 42, 21, "#f1f2f2");
   ctx.fillStyle = "#8a9490";
   ctx.font = "400 12px 'Yu Gothic', Meiryo, sans-serif";
-  ctx.fillText("メッセージを入力", 64, height - 31);
+  ctx.fillText("メッセージを入力", 142, height - 37);
   ctx.fillStyle = "#26302f";
   ctx.font = "700 22px 'Yu Gothic', Meiryo, sans-serif";
-  ctx.fillText("▶", width - 36, height - 36);
+  ctx.fillText("☺", width - 74, height - 42);
+  ctx.fillText("◉", width - 35, height - 42);
 }
 
 function drawAvatar(ctx, image, centerX, centerY, radius) {
@@ -809,6 +1108,44 @@ function formatDate(value) {
     weekday: "short"
   });
   return formatter.format(date);
+}
+
+function getChronologicalTime(value, editId = null) {
+  const candidate = formatTime(value || state.defaultTime);
+  const previous = getPreviousMessageTime(editId);
+  if (previous && compareTimes(candidate, previous) < 0) return previous;
+  return candidate;
+}
+
+function getPreviousMessageTime(editId = null) {
+  const endIndex = editId ? state.messages.findIndex((message) => message.id === editId) : state.messages.length;
+  const startIndex = endIndex === -1 ? state.messages.length - 1 : endIndex - 1;
+  for (let index = startIndex; index >= 0; index -= 1) {
+    const message = state.messages[index];
+    if (message.type !== "date" && message.time) return formatTime(message.time);
+  }
+  return "";
+}
+
+function getLastMessageTime() {
+  for (let index = state.messages.length - 1; index >= 0; index -= 1) {
+    const message = state.messages[index];
+    if (message.type !== "date" && message.time) return formatTime(message.time);
+  }
+  return "";
+}
+
+function compareTimes(left, right) {
+  const leftMinutes = timeToMinutes(left);
+  const rightMinutes = timeToMinutes(right);
+  if (leftMinutes === null || rightMinutes === null) return 0;
+  return leftMinutes - rightMinutes;
+}
+
+function timeToMinutes(value) {
+  const [hours, minutes] = formatTime(value).split(":").map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  return hours * 60 + minutes;
 }
 
 function formatTime(value) {

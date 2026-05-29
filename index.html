@@ -27,6 +27,16 @@
             <input id="dateInput" type="date" />
           </label>
 
+          <label class="check-row">
+            <input id="showInitialDateInput" type="checkbox" checked />
+            <span>最初の日付を表示する</span>
+          </label>
+
+          <label class="check-row">
+            <input id="showOuterFrameInput" type="checkbox" />
+            <span>上下の外側表示を付ける</span>
+          </label>
+
           <label class="field">
             <span>既定の時刻</span>
             <input id="defaultTimeInput" type="time" />
@@ -46,6 +56,45 @@
             <span>相手のアイコン画像</span>
             <input id="avatarInput" type="file" accept="image/*" />
           </label>
+
+          <fieldset class="color-options" aria-label="背景">
+            <legend>背景</legend>
+            <label>
+              <input type="radio" name="backgroundColor" value="blue" checked />
+              <span class="color-choice"><i style="--swatch: #8fa8c6"></i>青</span>
+            </label>
+            <label>
+              <input type="radio" name="backgroundColor" value="pink" />
+              <span class="color-choice"><i style="--swatch: #efb4c7"></i>ピンク</span>
+            </label>
+            <label>
+              <input type="radio" name="backgroundColor" value="image" />
+              <span class="color-choice image-swatch"><i style="--swatch: #dde7ef"></i>画像</span>
+            </label>
+          </fieldset>
+
+          <label id="backgroundImageField" class="file-field hidden">
+            <span>背景画像</span>
+            <input id="backgroundImageInput" type="file" accept="image/*" />
+          </label>
+
+          <fieldset class="color-options deco-options" aria-label="デコ">
+            <legend>デコ</legend>
+            <label>
+              <input type="radio" name="decorationTheme" value="none" checked />
+              <span class="color-choice no-deco-swatch"><i style="--swatch: #f7faf9"></i>なし</span>
+            </label>
+            <label>
+              <input type="radio" name="decorationTheme" value="decoDots" />
+              <span class="color-choice deco-swatch"><i style="--swatch: #a8c5df"></i>デコ1</span>
+            </label>
+            <label>
+              <input type="radio" name="decorationTheme" value="decoClouds" />
+              <span class="color-choice cloud-swatch"><i style="--swatch: #98b8d9"></i>デコ2</span>
+            </label>
+          </fieldset>
+
+          <button type="button" id="swapRolesButton" class="secondary-button role-swap-button">自分と相手を入れ替え</button>
         </form>
 
         <form id="messageForm" class="panel">
@@ -54,7 +103,7 @@
             <span id="editHint" class="edit-hint">新規追加</span>
           </div>
 
-          <fieldset class="segmented" aria-label="送信者">
+          <fieldset id="senderFieldset" class="segmented" aria-label="送信者">
             <legend>送信者</legend>
             <label>
               <input type="radio" name="sender" value="me" checked />
@@ -66,7 +115,7 @@
             </label>
           </fieldset>
 
-          <fieldset class="segmented" aria-label="種類">
+          <fieldset class="segmented message-type-options" aria-label="種類">
             <legend>種類</legend>
             <label>
               <input type="radio" name="messageType" value="text" checked />
@@ -75,6 +124,10 @@
             <label>
               <input type="radio" name="messageType" value="image" />
               <span>画像</span>
+            </label>
+            <label>
+              <input type="radio" name="messageType" value="date" />
+              <span>日付</span>
             </label>
           </fieldset>
 
@@ -88,11 +141,16 @@
             <input id="messageImageInput" type="file" accept="image/*" />
           </label>
 
+          <label id="dateField" class="field hidden">
+            <span>挿入する日付</span>
+            <input id="messageDateInput" type="date" />
+          </label>
+
           <div id="imagePreviewWrap" class="upload-preview hidden">
             <img id="imagePreview" alt="アップロード画像プレビュー" />
           </div>
 
-          <div class="inline-grid">
+          <div id="messageMetaControls" class="inline-grid">
             <label class="field">
               <span>時刻</span>
               <input id="messageTimeInput" type="time" />
@@ -123,22 +181,29 @@
           <button type="button" id="downloadButton" class="primary-button">PNG保存</button>
         </div>
         <div class="phone-frame">
-          <div class="phone-screen">
+          <div class="phone-screen outer-hidden">
             <div class="status-bar">
               <span id="statusTime">14:20</span>
-              <span>5G 100%</span>
+              <span class="status-icons">⌁ ✦ ♡ ✓</span>
+              <span class="status-network">⌁ Wi-Fi 5G 96</span>
             </div>
             <header class="talk-header">
               <button class="icon-button" type="button" aria-label="戻る">‹</button>
               <div class="header-avatar" id="headerAvatar"></div>
-              <strong id="headerName">佐藤さん</strong>
+              <div class="header-title">
+                <strong id="headerName">佐藤さん</strong>
+              </div>
+              <button class="icon-button" type="button" aria-label="検索">⌕</button>
+              <button class="icon-button" type="button" aria-label="一覧">▤</button>
               <button class="icon-button" type="button" aria-label="メニュー">≡</button>
             </header>
             <div class="chat-stream" id="chatStream"></div>
             <footer class="composer-bar" aria-hidden="true">
               <button type="button">＋</button>
-              <div class="fake-input">メッセージを入力</div>
-              <button type="button">▶</button>
+              <button type="button">▣</button>
+              <button type="button">▧</button>
+              <div class="fake-input"><span>メッセージを入力</span><b>☺</b></div>
+              <button type="button">◉</button>
             </footer>
           </div>
         </div>
