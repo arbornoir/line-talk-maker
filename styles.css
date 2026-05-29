@@ -717,6 +717,10 @@ input[type="file"] {
   background-size: contain;
 }
 
+.upload-indicator {
+  background-image: url("./upload-icon.png?v=20260530-2");
+}
+
 .meta {
   display: grid;
   gap: 1px;
