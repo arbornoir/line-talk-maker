@@ -137,8 +137,10 @@ function bindEvents() {
   });
 
   elements.defaultTimeInput.addEventListener("input", (event) => {
-    state.defaultTime = event.target.value || state.defaultTime;
-    elements.messageTimeInput.value = getChronologicalTime(state.defaultTime, state.editId);
+    state.defaultTime = formatTime(event.target.value || state.defaultTime);
+    if (!state.editId && !getLastMessageTime()) {
+      elements.messageTimeInput.value = state.defaultTime;
+    }
     render();
   });
 
@@ -178,7 +180,7 @@ function bindEvents() {
   });
 
   elements.messageTimeInput.addEventListener("change", () => {
-    elements.messageTimeInput.value = getChronologicalTime(elements.messageTimeInput.value, state.editId);
+    elements.messageTimeInput.value = formatTime(elements.messageTimeInput.value || state.defaultTime);
   });
 
   document.querySelectorAll("input[name='backgroundColor']").forEach((input) => {
@@ -367,7 +369,7 @@ function handleMessageSubmit(event) {
   event.preventDefault();
   const sender = document.querySelector("input[name='sender']:checked").value;
   const type = document.querySelector("input[name='messageType']:checked").value;
-  const time = getChronologicalTime(elements.messageTimeInput.value || state.defaultTime, state.editId);
+  const time = formatTime(elements.messageTimeInput.value || getLastMessageTime() || state.defaultTime);
   const text = elements.messageTextInput.value.trim();
 
   if (type === "date") {
@@ -1333,42 +1335,12 @@ function formatDate(value) {
   return formatter.format(date);
 }
 
-function getChronologicalTime(value, editId = null) {
-  const candidate = formatTime(value || state.defaultTime);
-  const previous = getPreviousMessageTime(editId);
-  if (previous && compareTimes(candidate, previous) < 0) return previous;
-  return candidate;
-}
-
-function getPreviousMessageTime(editId = null) {
-  const endIndex = editId ? state.messages.findIndex((message) => message.id === editId) : state.messages.length;
-  const startIndex = endIndex === -1 ? state.messages.length - 1 : endIndex - 1;
-  for (let index = startIndex; index >= 0; index -= 1) {
-    const message = state.messages[index];
-    if (message.type !== "date" && message.time) return formatTime(message.time);
-  }
-  return "";
-}
-
 function getLastMessageTime() {
   for (let index = state.messages.length - 1; index >= 0; index -= 1) {
     const message = state.messages[index];
     if (message.type !== "date" && message.time) return formatTime(message.time);
   }
   return "";
-}
-
-function compareTimes(left, right) {
-  const leftMinutes = timeToMinutes(left);
-  const rightMinutes = timeToMinutes(right);
-  if (leftMinutes === null || rightMinutes === null) return 0;
-  return leftMinutes - rightMinutes;
-}
-
-function timeToMinutes(value) {
-  const [hours, minutes] = formatTime(value).split(":").map(Number);
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
-  return hours * 60 + minutes;
 }
 
 function formatTime(value) {
