@@ -46,6 +46,7 @@ const state = {
   backgroundImageSrc: "",
   avatarSrc: "",
   editId: null,
+  insertAfterId: null,
   draftImageSrc: "",
   messages: [
     {
@@ -116,6 +117,7 @@ const elements = {
   downloadButton: document.querySelector("#downloadButton"),
   swapRolesButton: document.querySelector("#swapRolesButton")
 };
+let draggedMessageId = null;
 
 function init() {
   elements.dateInput.value = state.date;
@@ -328,8 +330,13 @@ function renderMessageList() {
   state.messages.forEach((message, index) => {
     const item = document.createElement("div");
     item.className = "list-item";
+    item.draggable = true;
+    item.dataset.messageId = message.id;
+    item.classList.toggle("insert-target", state.insertAfterId === message.id);
+    bindMessageDragEvents(item, message.id);
 
     const detail = document.createElement("div");
+    detail.className = "list-detail";
     const title = document.createElement("strong");
     title.textContent =
       message.type === "date"
@@ -343,13 +350,20 @@ function renderMessageList() {
     const actions = document.createElement("div");
     actions.className = "list-actions";
     actions.append(
+      makeMiniButton("+", "この下に差し込み追加", () => prepareInsertAfter(message.id)),
       makeMiniButton("↑", "上へ", () => moveMessage(index, -1)),
       makeMiniButton("↓", "下へ", () => moveMessage(index, 1)),
       makeMiniButton("編", "編集", () => editMessage(message.id)),
       makeMiniButton("×", "削除", () => deleteMessage(message.id))
     );
 
-    item.append(detail, actions);
+    const dragHandle = document.createElement("span");
+    dragHandle.className = "drag-handle";
+    dragHandle.textContent = "↕";
+    dragHandle.title = "ドラッグして移動";
+    dragHandle.setAttribute("aria-hidden", "true");
+
+    item.append(dragHandle, detail, actions);
     elements.messageList.append(item);
   });
 }
@@ -371,6 +385,7 @@ function handleMessageSubmit(event) {
   const type = document.querySelector("input[name='messageType']:checked").value;
   const time = formatTime(elements.messageTimeInput.value || getLastMessageTime() || state.defaultTime);
   const text = elements.messageTextInput.value.trim();
+  const shouldScrollToEnd = !state.insertAfterId;
 
   if (type === "date") {
     const payload = {
@@ -379,17 +394,15 @@ function handleMessageSubmit(event) {
       date: elements.messageDateInput.value || state.date
     };
 
-    if (state.editId) {
-      state.messages = state.messages.map((message) => (message.id === state.editId ? payload : message));
-    } else {
-      state.messages.push(payload);
-    }
+    saveMessagePayload(payload);
 
     clearEditor();
     render();
-    requestAnimationFrame(() => {
-      elements.chatStream.scrollTop = elements.chatStream.scrollHeight;
-    });
+    if (shouldScrollToEnd) {
+      requestAnimationFrame(() => {
+        elements.chatStream.scrollTop = elements.chatStream.scrollHeight;
+      });
+    }
     return;
   }
 
@@ -413,16 +426,117 @@ function handleMessageSubmit(event) {
     imageSrc: type === "image" ? state.draftImageSrc : ""
   };
 
+  saveMessagePayload(payload);
+
+  clearEditor({ nextTime: time });
+  render();
+  if (shouldScrollToEnd) {
+    requestAnimationFrame(() => {
+      elements.chatStream.scrollTop = elements.chatStream.scrollHeight;
+    });
+  }
+}
+
+function saveMessagePayload(payload) {
   if (state.editId) {
     state.messages = state.messages.map((message) => (message.id === state.editId ? payload : message));
-  } else {
-    state.messages.push(payload);
+    return;
   }
 
-  clearEditor();
+  if (state.insertAfterId) {
+    const insertIndex = state.messages.findIndex((message) => message.id === state.insertAfterId);
+    if (insertIndex !== -1) {
+      state.messages.splice(insertIndex + 1, 0, payload);
+      return;
+    }
+  }
+
+  state.messages.push(payload);
+}
+
+function prepareInsertAfter(id) {
+  const wasEditing = Boolean(state.editId);
+  state.editId = null;
+  state.insertAfterId = id;
+  if (wasEditing) {
+    state.draftImageSrc = "";
+    elements.messageTextInput.value = "";
+    elements.messageImageInput.value = "";
+    document.querySelector("input[name='messageType'][value='text']").checked = true;
+    elements.imagePreviewWrap.classList.add("hidden");
+  }
+  elements.submitMessageButton.textContent = "差し込み追加";
+  elements.cancelEditButton.classList.remove("hidden");
+  elements.editHint.textContent = "差し込み追加中";
+  renderMessageTypeFields();
+  syncReadAvailability();
   render();
-  requestAnimationFrame(() => {
-    elements.chatStream.scrollTop = elements.chatStream.scrollHeight;
+  elements.messageForm.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+function bindMessageDragEvents(item, messageId) {
+  item.addEventListener("dragstart", (event) => {
+    if (event.target.closest("button")) {
+      event.preventDefault();
+      return;
+    }
+    draggedMessageId = messageId;
+    item.classList.add("dragging");
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", messageId);
+  });
+
+  item.addEventListener("dragover", (event) => {
+    if (!draggedMessageId || draggedMessageId === messageId) return;
+    event.preventDefault();
+    const rect = item.getBoundingClientRect();
+    const placeAfter = event.clientY > rect.top + rect.height / 2;
+    clearDropIndicators();
+    item.classList.add(placeAfter ? "drop-after" : "drop-before");
+    event.dataTransfer.dropEffect = "move";
+  });
+
+  item.addEventListener("dragleave", () => {
+    item.classList.remove("drop-before", "drop-after");
+  });
+
+  item.addEventListener("drop", (event) => {
+    event.preventDefault();
+    const draggedId = event.dataTransfer.getData("text/plain") || draggedMessageId;
+    const rect = item.getBoundingClientRect();
+    const placeAfter = event.clientY > rect.top + rect.height / 2;
+    reorderMessage(draggedId, messageId, placeAfter);
+    draggedMessageId = null;
+    clearDropIndicators();
+  });
+
+  item.addEventListener("dragend", () => {
+    draggedMessageId = null;
+    clearDropIndicators();
+  });
+}
+
+function reorderMessage(draggedId, targetId, placeAfter) {
+  if (!draggedId || !targetId || draggedId === targetId) return;
+  const fromIndex = state.messages.findIndex((message) => message.id === draggedId);
+  const targetIndex = state.messages.findIndex((message) => message.id === targetId);
+  if (fromIndex === -1 || targetIndex === -1) return;
+
+  const copy = [...state.messages];
+  const [moved] = copy.splice(fromIndex, 1);
+  let insertIndex = copy.findIndex((message) => message.id === targetId);
+  if (insertIndex === -1) return;
+  if (placeAfter) insertIndex += 1;
+  copy.splice(insertIndex, 0, moved);
+  state.messages = copy;
+
+  if (!state.editId) elements.messageTimeInput.value = getLastMessageTime() || state.defaultTime;
+  render();
+}
+
+function clearDropIndicators() {
+  elements.messageList.querySelectorAll(".drop-before, .drop-after, .dragging").forEach((item) => {
+    item.classList.remove("drop-before", "drop-after", "dragging");
   });
 }
 
@@ -430,6 +544,7 @@ function editMessage(id) {
   const message = state.messages.find((item) => item.id === id);
   if (!message) return;
   state.editId = id;
+  state.insertAfterId = null;
 
   document.querySelector(`input[name='messageType'][value='${message.type}']`).checked = true;
   if (message.type !== "date") {
@@ -456,8 +571,9 @@ function editMessage(id) {
 }
 
 function deleteMessage(id) {
+  const wasInsertTarget = state.insertAfterId === id;
   state.messages = state.messages.filter((message) => message.id !== id);
-  if (state.editId === id) clearEditor();
+  if (state.editId === id || wasInsertTarget) clearEditor();
   if (!state.editId) elements.messageTimeInput.value = getLastMessageTime() || state.defaultTime;
   render();
 }
@@ -472,12 +588,13 @@ function moveMessage(index, direction) {
   render();
 }
 
-function clearEditor() {
+function clearEditor(options = {}) {
   state.editId = null;
+  state.insertAfterId = null;
   state.draftImageSrc = "";
   elements.messageTextInput.value = "";
   elements.messageImageInput.value = "";
-  elements.messageTimeInput.value = getLastMessageTime() || state.defaultTime;
+  elements.messageTimeInput.value = options.nextTime || getLastMessageTime() || state.defaultTime;
   elements.messageDateInput.value = state.date;
   elements.readInput.checked = true;
   document.querySelector("input[name='sender'][value='me']").checked = true;
@@ -501,6 +618,7 @@ function resetAll() {
   state.decorationTheme = "none";
   state.backgroundImageSrc = "";
   state.avatarSrc = "";
+  state.insertAfterId = null;
   state.messages = [];
   elements.avatarInput.value = "";
   elements.backgroundImageInput.value = "";

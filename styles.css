@@ -364,14 +364,15 @@ input[type="file"] {
   display: grid;
   gap: 8px;
   max-height: 310px;
-  overflow: auto;
-  padding-right: 3px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 2px 7px 2px 2px;
 }
 
 .list-item {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 10px;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 8px;
   align-items: center;
   padding: 10px;
   border: 1px solid var(--line);
@@ -379,35 +380,72 @@ input[type="file"] {
   background: #fbfdfc;
 }
 
-.list-item strong {
+.list-detail {
+  min-width: 0;
+}
+
+.list-detail strong {
   display: block;
   margin-bottom: 3px;
   font-size: 0.88rem;
 }
 
-.list-item span {
+.list-detail span {
   display: block;
   color: var(--muted);
   font-size: 0.78rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 220px;
+  max-width: 100%;
 }
 
 .list-actions {
-  display: flex;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: repeat(3, 30px);
+  gap: 4px;
+  justify-content: end;
 }
 
 .mini-button {
-  min-width: 34px;
-  min-height: 34px;
+  width: 30px;
+  min-width: 30px;
+  min-height: 30px;
   border: 1px solid #d2ddd9;
-  border-radius: 8px;
+  border-radius: 7px;
   background: #ffffff;
   color: var(--ink);
+  font-size: 0.8rem;
   font-weight: 800;
+}
+
+.drag-handle {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  min-height: 34px;
+  border-radius: 7px;
+  color: #8fa19b;
+  font-weight: 800;
+  cursor: grab;
+  user-select: none;
+}
+
+.list-item.dragging {
+  opacity: 0.55;
+}
+
+.list-item.drop-before {
+  box-shadow: inset 0 3px 0 var(--brand);
+}
+
+.list-item.drop-after {
+  box-shadow: inset 0 -3px 0 var(--brand);
+}
+
+.list-item.insert-target {
+  border-color: var(--brand);
+  background: #f0fbf5;
 }
 
 .preview-area {
