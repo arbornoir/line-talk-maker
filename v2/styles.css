@@ -279,6 +279,19 @@ legend { margin-bottom: 8px; color: var(--muted); font-size: 0.8rem; font-weight
 }
 .inline-read-field input { width: 16px; height: 16px; accent-color: var(--brand); }
 .inline-read-field span { overflow: visible; color: var(--muted); text-overflow: clip; }
+.inline-sender-toggle {
+  border: 1px solid #b8c6c0;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 0.7rem;
+  font-weight: 850;
+  line-height: 1;
+  white-space: nowrap;
+}
+.inline-sender-toggle.me { border-color: #76bf6b; background: #eefae9; color: #24752b; }
+.inline-sender-toggle.them { border-color: #9aa8a2; background: #f4f6f5; color: #4e5b56; }
 .list-actions { display: flex; gap: 4px; }
 .mini-button { width: 29px; height: 29px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--ink); font-size: .75rem; font-weight: 900; }
 

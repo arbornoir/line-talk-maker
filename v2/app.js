@@ -1,6 +1,7 @@
 const today = new Date();
 const pad = (value) => String(value).padStart(2, "0");
 const defaultDate = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+const defaultMessageInterval = 0.5;
 const demoImageSrc =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 460'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='1'%3E%3Cstop stop-color='%23ffe08a'/%3E%3Cstop offset='.52' stop-color='%23ff7a59'/%3E%3Cstop offset='1' stop-color='%2306c755'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='640' height='460' rx='34' fill='url(%23g)'/%3E%3Ccircle cx='500' cy='100' r='70' fill='rgba(255,255,255,.42)'/%3E%3Cpath d='M70 345 235 190l105 98 75-70 155 127z' fill='rgba(255,255,255,.78)'/%3E%3Ctext x='54' y='72' fill='white' font-family='Arial,sans-serif' font-size='42' font-weight='700'%3EImage message%3C/text%3E%3C/svg%3E";
 const uploadIconSrc = "../upload-icon.png?v=20260530-2";
@@ -465,6 +466,15 @@ function renderMessageList() {
       timeLabel.append(timeLabelText, timeInput);
       inlineEditor.append(timeLabel);
 
+      const senderToggle = document.createElement("button");
+      senderToggle.type = "button";
+      senderToggle.className = `inline-sender-toggle ${message.sender}`;
+      senderToggle.textContent = message.sender === "me" ? "自分 → 相手" : "相手 → 自分";
+      senderToggle.title = message.sender === "me" ? "相手側に切り替える" : "自分側に切り替える";
+      senderToggle.setAttribute("aria-label", `${displayIndex}件目を${message.sender === "me" ? "相手" : "自分"}側に切り替える`);
+      senderToggle.addEventListener("click", () => toggleMessageSender(message.id));
+      inlineEditor.append(senderToggle);
+
       if (message.sender === "me") {
         const readLabel = document.createElement("label");
         readLabel.className = "inline-read-field";
@@ -533,10 +543,16 @@ function getSceneTimeMessages(group) {
 }
 
 function inferSceneInterval(messages) {
-  if (messages.length < 2) return 1;
+  if (messages.length < 2) return defaultMessageInterval;
   const first = timeToMinutes(messages[0].time);
   const second = timeToMinutes(messages[1].time);
   const difference = (second - first + 1440) % 1440;
+  if (difference === 0 && messages.length === 2) return defaultMessageInterval;
+  if (difference === 0 && messages.length >= 3) {
+    const third = timeToMinutes(messages[2].time);
+    const twoMessageDifference = (third - first + 1440) % 1440;
+    if (twoMessageDifference === 1) return defaultMessageInterval;
+  }
   return Math.min(720, difference);
 }
 
@@ -589,6 +605,7 @@ function makeSceneControl(group, sceneNumber) {
   intervalInput.type = "number";
   intervalInput.min = "0";
   intervalInput.max = "720";
+  intervalInput.step = "0.5";
   intervalInput.value = String(inferSceneInterval(messages));
   intervalInput.setAttribute("aria-label", `${group.label}の時刻間隔`);
   intervalLabel.append(intervalInput);
@@ -600,8 +617,8 @@ function makeSceneControl(group, sceneNumber) {
   applyButton.disabled = messages.length === 0;
   applyButton.addEventListener("click", () => {
     const start = startInput.value || state.defaultTime;
-    const interval = clampNumber(intervalInput.value, 0, 720, 1);
-    const changes = messages.map((message, index) => ({ id: message.id, time: addMinutes(start, interval * index) }));
+    const interval = clampNumber(intervalInput.value, 0, 720, defaultMessageInterval);
+    const changes = messages.map((message, index) => ({ id: message.id, time: getIntervalTime(start, interval, index) }));
     commitTimeChanges(changes, `${group.label}の時刻を変更しました`);
   });
 
@@ -899,6 +916,22 @@ function swapRoles() {
       elements.readInput.checked = Boolean(editedMessage.read);
       syncReadAvailability();
     }
+  }
+
+  render();
+}
+
+function toggleMessageSender(messageId) {
+  const message = state.messages.find((item) => item.id === messageId);
+  if (!message || message.type === "date" || message.type === "scene") return;
+
+  message.sender = message.sender === "me" ? "them" : "me";
+  message.read = message.sender === "me";
+
+  if (state.editId === messageId) {
+    document.querySelector(`input[name='sender'][value='${message.sender}']`).checked = true;
+    elements.readInput.checked = Boolean(message.read);
+    syncReadAvailability();
   }
 
   render();
@@ -2237,8 +2270,8 @@ function computeTimeBulkChanges(messages) {
     return messages.map((message, index) => ({ id: message.id, time: minutesToTime(startMinutes + Math.round(step * index)) }));
   }
 
-  const interval = clampNumber(elements.timeBulkIntervalInput.value, 0, 720, 1);
-  return messages.map((message, index) => ({ id: message.id, time: addMinutes(startTime, interval * index) }));
+  const interval = clampNumber(elements.timeBulkIntervalInput.value, 0, 720, defaultMessageInterval);
+  return messages.map((message, index) => ({ id: message.id, time: getIntervalTime(startTime, interval, index) }));
 }
 
 function applyTimeBulkChange() {
@@ -2289,6 +2322,11 @@ function clampNumber(value, min, max, fallback) {
   const number = Number(value);
   if (!Number.isFinite(number)) return fallback;
   return Math.min(max, Math.max(min, number));
+}
+
+function getIntervalTime(startTime, interval, index) {
+  const elapsedMinutes = Math.floor(interval * index + Number.EPSILON);
+  return addMinutes(startTime, elapsedMinutes);
 }
 
 function importBulkScript() {
@@ -2434,9 +2472,10 @@ function parseBulkScript(script, protagonist) {
   const messages = [];
   const protagonistLabel = normalizeSpeakerLabel(protagonist);
   let nextUnknownSender = "them";
-  let time = elements.scriptImportMode.value === "append" && getLastMessageTime()
+  const startTime = elements.scriptImportMode.value === "append" && getLastMessageTime()
     ? addMinutes(getLastMessageTime(), 1)
     : state.defaultTime;
+  let dialogueIndex = 0;
 
   entries.forEach((entry) => {
     if (entry.type === "scene") {
@@ -2449,8 +2488,9 @@ function parseBulkScript(script, protagonist) {
       sender = nextUnknownSender;
       nextUnknownSender = nextUnknownSender === "them" ? "me" : "them";
     }
+    const time = getIntervalTime(startTime, defaultMessageInterval, dialogueIndex);
     messages.push(makeImportedTextMessage(sender, entry.text, time));
-    time = addMinutes(time, 1);
+    dialogueIndex += 1;
   });
   return messages;
 }
