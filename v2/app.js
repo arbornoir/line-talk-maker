@@ -2,6 +2,7 @@ const today = new Date();
 const pad = (value) => String(value).padStart(2, "0");
 const defaultDate = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
 const defaultMessageInterval = 0.5;
+const circledImageNumbers = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"];
 const demoImageSrc =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 460'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='1'%3E%3Cstop stop-color='%23ffe08a'/%3E%3Cstop offset='.52' stop-color='%23ff7a59'/%3E%3Cstop offset='1' stop-color='%2306c755'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='640' height='460' rx='34' fill='url(%23g)'/%3E%3Ccircle cx='500' cy='100' r='70' fill='rgba(255,255,255,.42)'/%3E%3Cpath d='M70 345 235 190l105 98 75-70 155 127z' fill='rgba(255,255,255,.78)'/%3E%3Ctext x='54' y='72' fill='white' font-family='Arial,sans-serif' font-size='42' font-weight='700'%3EImage message%3C/text%3E%3C/svg%3E";
 const uploadIconSrc = "../upload-icon.png?v=20260530-2";
@@ -131,6 +132,8 @@ const elements = {
   exportProjectButton: document.querySelector("#exportProjectButton"),
   importProjectInput: document.querySelector("#importProjectInput"),
   bulkScriptInput: document.querySelector("#bulkScriptInput"),
+  bulkScriptImageInput: document.querySelector("#bulkScriptImageInput"),
+  bulkImageStatus: document.querySelector("#bulkImageStatus"),
   protagonistSelect: document.querySelector("#protagonistSelect"),
   speakerStatus: document.querySelector("#speakerStatus"),
   scriptImportMode: document.querySelector("#scriptImportMode"),
@@ -160,6 +163,7 @@ let workspaceData = null;
 let persistenceReady = false;
 let autoSaveTimer = null;
 let lastTimeBulkUndo = null;
+let bulkScriptImages = [];
 
 function init() {
   initializeWorkspace();
@@ -175,6 +179,7 @@ function init() {
   elements.messageDateInput.value = state.date;
   bindEvents();
   updateSpeakerChoices();
+  renderBulkImageStatus();
   persistenceReady = true;
   render();
   setSaveStatus("保存済み");
@@ -293,7 +298,11 @@ function bindEvents() {
   elements.deleteProjectButton.addEventListener("click", deleteCurrentProject);
   elements.exportProjectButton.addEventListener("click", exportCurrentProject);
   elements.importProjectInput.addEventListener("change", importProjectFile);
-  elements.bulkScriptInput.addEventListener("input", updateSpeakerChoices);
+  elements.bulkScriptInput.addEventListener("input", () => {
+    updateSpeakerChoices();
+    renderBulkImageStatus();
+  });
+  elements.bulkScriptImageInput.addEventListener("change", loadBulkScriptImages);
   elements.importScriptButton.addEventListener("click", importBulkScript);
   [
     elements.timeBulkStartSelect,
@@ -2329,6 +2338,78 @@ function getIntervalTime(startTime, interval, index) {
   return addMinutes(startTime, elapsedMinutes);
 }
 
+async function loadBulkScriptImages(event) {
+  const files = [...(event.target.files || [])].filter((file) => file.type.startsWith("image/"));
+  bulkScriptImages = await Promise.all(files.map(async (file, selectionIndex) => ({
+    fileName: file.name,
+    imageSrc: await readFileAsDataUrl(file),
+    number: getCircledImageNumber(file.name),
+    selectionIndex
+  })));
+  bulkScriptImages.sort((left, right) => {
+    if (left.number === null && right.number === null) return left.selectionIndex - right.selectionIndex;
+    if (left.number === null) return 1;
+    if (right.number === null) return -1;
+    return left.number - right.number || left.selectionIndex - right.selectionIndex;
+  });
+  renderBulkImageStatus();
+}
+
+function getCircledImageNumber(fileName) {
+  const name = String(fileName || "");
+  const index = circledImageNumbers.findIndex((symbol) => name.includes(symbol));
+  return index === -1 ? null : index + 1;
+}
+
+function getScriptImagePlan(script) {
+  const imageEntries = extractScriptEntries(script).filter((entry) => entry.type === "image");
+  return {
+    totalCount: imageEntries.length,
+    targetCount: Math.max(0, imageEntries.length - 1)
+  };
+}
+
+function getBulkImageValidation(script) {
+  const plan = getScriptImagePlan(script);
+  if (plan.targetCount === 0) return { plan, error: "" };
+  if (bulkScriptImages.length < plan.targetCount) {
+    return { plan, error: `LINEに表示する画像が${plan.targetCount}枚必要です。` };
+  }
+  const targetImages = bulkScriptImages.slice(0, plan.targetCount);
+  if (targetImages.some((image) => image.number === null)) {
+    return { plan, error: "画像ファイル名に①②…の通し番号を入れてください。" };
+  }
+  const actualNumbers = targetImages.map((image) => image.number);
+  const expectedNumbers = Array.from({ length: plan.targetCount }, (_, index) => index + 1);
+  if (actualNumbers.some((number, index) => number !== expectedNumbers[index])) {
+    return { plan, error: `画像番号を${expectedNumbers.map((number) => circledImageNumbers[number - 1]).join("")}の順で揃えてください。` };
+  }
+  return { plan, error: "" };
+}
+
+function renderBulkImageStatus() {
+  const script = elements.bulkScriptInput.value;
+  const { plan, error } = getBulkImageValidation(script);
+  if (!script.trim()) {
+    elements.bulkImageStatus.textContent = bulkScriptImages.length
+      ? `${bulkScriptImages.length}枚を選択済みです。台本を貼り付けると対応状況を確認できます。`
+      : "台本と画像を選択すると対応状況を表示します。";
+    elements.bulkImageStatus.classList.remove("error");
+    return;
+  }
+  if (plan.totalCount === 0) {
+    elements.bulkImageStatus.textContent = "台本に【画像】はありません。";
+    elements.bulkImageStatus.classList.remove("error");
+    return;
+  }
+  const names = bulkScriptImages.map((image) => image.fileName).join("、");
+  const selectedText = bulkScriptImages.length ? ` 選択済み：${names}` : "";
+  elements.bulkImageStatus.textContent = error
+    ? `${error} 最後の【画像】1件はLINE画面から除外します。${selectedText}`
+    : `表示対象${plan.targetCount}件に画像を対応付けます。最後の【画像】1件はLINE画面から除外します。${selectedText}`;
+  elements.bulkImageStatus.classList.toggle("error", Boolean(error));
+}
+
 function importBulkScript() {
   const script = elements.bulkScriptInput.value.trim();
   if (!script) {
@@ -2345,8 +2426,16 @@ function importBulkScript() {
     return;
   }
 
-  const parsed = parseBulkScript(script, protagonist);
+  const imageValidation = getBulkImageValidation(script);
+  if (imageValidation.error) {
+    elements.scriptStatus.textContent = imageValidation.error;
+    elements.bulkScriptImageInput.focus();
+    return;
+  }
+
+  const parsed = parseBulkScript(script, protagonist, bulkScriptImages);
   const importedMessageCount = parsed.filter(isTimeBearingMessage).length;
+  const importedImageCount = parsed.filter((message) => message.type === "image").length;
   const importedSceneCount = parsed.filter((message) => message.type === "scene").length;
   if (importedMessageCount === 0) {
     elements.scriptStatus.textContent = "メッセージとして読み取れる行がありませんでした。";
@@ -2361,7 +2450,9 @@ function importBulkScript() {
   clearEditor({ nextTime: getLastMessageTime() || state.defaultTime });
   render();
   const sceneText = importedSceneCount ? `、${importedSceneCount}件のシーン区切りを取得` : "";
-  elements.scriptStatus.textContent = `${importedMessageCount}件のメッセージ${sceneText}しました。時刻と自分側の既読は一覧上で直接変更できます。`;
+  const imageText = importedImageCount ? `（画像${importedImageCount}件を含む）` : "";
+  const excludedImageText = imageValidation.plan.totalCount ? " 最後の【画像】1件は除外しました。" : "";
+  elements.scriptStatus.textContent = `${importedMessageCount}件のメッセージ${imageText}${sceneText}を作成しました。${excludedImageText}時刻・既読・送信者は一覧上で直接変更できます。`;
 }
 
 function updateSpeakerChoices() {
@@ -2427,7 +2518,10 @@ function extractScriptEntries(script) {
         entries.push({ type: "scene", label: text });
         return;
       }
-      if (isIgnoredScriptSpeaker(speaker)) return;
+      if (isImageScriptSpeaker(speaker)) {
+        entries.push({ type: "image", description: text });
+        return;
+      }
       if (normalizeSpeakerLabel(speaker) === "話者" && normalizeSpeakerLabel(text) === "セリフ") return;
       entries.push({ type: "dialogue", speaker, text });
       return;
@@ -2442,7 +2536,10 @@ function extractScriptEntries(script) {
         entries.push({ type: "scene", label: text });
         return;
       }
-      if (isIgnoredScriptSpeaker(speaker)) return;
+      if (isImageScriptSpeaker(speaker)) {
+        entries.push({ type: "image", description: text });
+        return;
+      }
       entries.push({ type: "dialogue", speaker, text });
       return;
     }
@@ -2457,7 +2554,7 @@ function extractScriptEntries(script) {
   return entries;
 }
 
-function isIgnoredScriptSpeaker(speaker) {
+function isImageScriptSpeaker(speaker) {
   const normalized = normalizeSpeakerLabel(speaker).replace(/[【】\[\]]/g, "");
   return normalized === "画像";
 }
@@ -2467,19 +2564,33 @@ function isTimeProgressSpeaker(speaker) {
   return normalized === "時間経過";
 }
 
-function parseBulkScript(script, protagonist) {
+function parseBulkScript(script, protagonist, images = []) {
   const entries = extractScriptEntries(script);
   const messages = [];
   const protagonistLabel = normalizeSpeakerLabel(protagonist);
   let nextUnknownSender = "them";
+  let previousSender = elements.scriptImportMode.value === "append"
+    ? [...state.messages].reverse().find((message) => message.type === "text" || message.type === "image")?.sender || "them"
+    : "them";
   const startTime = elements.scriptImportMode.value === "append" && getLastMessageTime()
     ? addMinutes(getLastMessageTime(), 1)
     : state.defaultTime;
-  let dialogueIndex = 0;
+  const finalImageEntryIndex = entries.findLastIndex((entry) => entry.type === "image");
+  let messageIndex = 0;
+  let imageIndex = 0;
 
-  entries.forEach((entry) => {
+  entries.forEach((entry, entryIndex) => {
     if (entry.type === "scene") {
       messages.push({ id: crypto.randomUUID(), type: "scene", label: entry.label || "シーン切り替え" });
+      return;
+    }
+    if (entry.type === "image") {
+      if (entryIndex === finalImageEntryIndex) return;
+      const image = images[imageIndex];
+      const time = getIntervalTime(startTime, defaultMessageInterval, messageIndex);
+      messages.push(makeImportedImageMessage(previousSender, image?.imageSrc || "", time));
+      imageIndex += 1;
+      messageIndex += 1;
       return;
     }
     let sender;
@@ -2488,9 +2599,10 @@ function parseBulkScript(script, protagonist) {
       sender = nextUnknownSender;
       nextUnknownSender = nextUnknownSender === "them" ? "me" : "them";
     }
-    const time = getIntervalTime(startTime, defaultMessageInterval, dialogueIndex);
+    const time = getIntervalTime(startTime, defaultMessageInterval, messageIndex);
     messages.push(makeImportedTextMessage(sender, entry.text, time));
-    dialogueIndex += 1;
+    previousSender = sender;
+    messageIndex += 1;
   });
   return messages;
 }
@@ -2504,6 +2616,18 @@ function makeImportedTextMessage(sender, text, time) {
     time: formatTime(time),
     read: sender === "me",
     imageSrc: ""
+  };
+}
+
+function makeImportedImageMessage(sender, imageSrc, time) {
+  return {
+    id: crypto.randomUUID(),
+    sender,
+    type: "image",
+    text: "",
+    time: formatTime(time),
+    read: sender === "me",
+    imageSrc
   };
 }
 

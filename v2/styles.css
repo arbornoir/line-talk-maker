@@ -139,6 +139,20 @@ h2 { margin-bottom: 0; font-size: 1.05rem; }
 .inline-status { min-height: 1.3em; margin: 10px 0 0; color: var(--brand-dark); font-size: 0.82rem; font-weight: 800; }
 .protagonist-field { margin-top: 14px; }
 .speaker-status { margin-top: 7px; color: var(--muted); font-weight: 700; }
+.bulk-image-field { margin-top: 13px; }
+.bulk-image-status {
+  margin-top: 8px;
+  border: 1px solid #c8ddd4;
+  border-radius: 9px;
+  padding: 9px 11px;
+  background: #f5fbf8;
+  color: var(--brand-dark);
+  font-size: 0.76rem;
+  font-weight: 750;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.bulk-image-status.error { border-color: #e5b5b5; background: #fff5f5; color: var(--danger); }
 
 .check-row { display: flex; align-items: center; gap: 9px; margin: 12px 0; color: var(--ink); font-size: 0.86rem; font-weight: 750; cursor: pointer; }
 .check-row input { width: 18px; height: 18px; accent-color: var(--brand); }
