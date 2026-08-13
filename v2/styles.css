@@ -446,6 +446,15 @@ legend { margin-bottom: 8px; color: var(--muted); font-size: 0.8rem; font-weight
   object-fit: contain;
   background: #dce6e1;
 }
+.empty-image-bubble {
+  display: grid;
+  min-height: 150px;
+  place-items: center;
+  background: #dce6e1;
+  color: #687872;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
 .upload-indicator {
   position: absolute;
   left: -34px;

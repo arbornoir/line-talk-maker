@@ -376,10 +376,17 @@ function renderChat() {
       uploadIcon.setAttribute("aria-hidden", "true");
       wrap.append(uploadIcon);
 
-      const img = document.createElement("img");
-      img.src = message.imageSrc;
-      img.alt = "送信画像";
-      bubble.append(img);
+      if (message.imageSrc) {
+        const img = document.createElement("img");
+        img.src = message.imageSrc;
+        img.alt = "送信画像";
+        bubble.append(img);
+      } else {
+        bubble.classList.add("empty-image-bubble");
+        const placeholder = document.createElement("span");
+        placeholder.textContent = "画像未設定";
+        bubble.append(placeholder);
+      }
     } else {
       const layout = getBubbleTextLayout(message.text || "", message.sender);
       bubble.textContent = layout.text;
@@ -450,7 +457,11 @@ function renderMessageList() {
         : `${displayIndex}. ${message.sender === "me" ? "自分" : "相手"} / ${formatTime(message.time)}`;
     const summary = document.createElement("span");
     summary.textContent =
-      message.type === "date" ? formatDate(message.date) : message.type === "image" ? "画像メッセージ" : message.text;
+      message.type === "date"
+        ? formatDate(message.date)
+        : message.type === "image"
+          ? message.imageSrc ? "画像メッセージ" : "画像未設定"
+          : message.text;
     detail.append(title, summary);
 
     if (message.type !== "date") {
@@ -464,13 +475,28 @@ function renderMessageList() {
       const timeInput = document.createElement("input");
       timeInput.type = "time";
       timeInput.value = formatTime(message.time || state.defaultTime);
+      timeInput.dataset.originalTime = timeInput.value;
       timeInput.setAttribute("aria-label", `${displayIndex}件目の時刻`);
+      timeInput.addEventListener("focus", () => {
+        timeInput.dataset.originalTime = formatTime(message.time || state.defaultTime);
+      });
       timeInput.addEventListener("input", (event) => {
         const nextTime = formatTime(event.target.value || message.time || state.defaultTime);
         message.time = nextTime;
         title.textContent = `${displayIndex}. ${message.sender === "me" ? "自分" : "相手"} / ${nextTime}`;
         renderChat();
         scheduleAutoSave();
+      });
+      timeInput.addEventListener("change", (event) => {
+        const previousTime = formatTime(timeInput.dataset.originalTime || message.time || state.defaultTime);
+        const nextTime = formatTime(event.target.value || message.time || state.defaultTime);
+        const shiftedCount = shiftFollowingMessageTimesInScene(message.id, previousTime, nextTime);
+        message.time = nextTime;
+        lastTimeBulkUndo = null;
+        render();
+        elements.timeBulkPreview.textContent = shiftedCount
+          ? `${displayIndex}件目より後の同じシーン内${shiftedCount}件を${formatSignedMinutes(timeToMinutes(nextTime) - timeToMinutes(previousTime))}ずらしました。`
+          : `${displayIndex}件目の時刻を${nextTime}に変更しました。`;
       });
       timeLabel.append(timeLabelText, timeInput);
       inlineEditor.append(timeLabel);
@@ -684,6 +710,8 @@ function handleMessageSubmit(event) {
     return;
   }
 
+  const editedMessage = state.editId ? state.messages.find((message) => message.id === state.editId) : null;
+  const previousTime = editedMessage && isTimeBearingMessage(editedMessage) ? editedMessage.time : "";
   const payload = {
     id: state.editId || crypto.randomUUID(),
     sender,
@@ -695,9 +723,16 @@ function handleMessageSubmit(event) {
   };
 
   saveMessagePayload(payload);
+  const shiftedCount = previousTime && previousTime !== time
+    ? shiftFollowingMessageTimesInScene(payload.id, previousTime, time)
+    : 0;
+  if (previousTime && previousTime !== time) lastTimeBulkUndo = null;
 
   clearEditor({ nextTime: time });
   render();
+  if (shiftedCount) {
+    elements.timeBulkPreview.textContent = `編集したメッセージより後の同じシーン内${shiftedCount}件を${formatSignedMinutes(timeToMinutes(time) - timeToMinutes(previousTime))}ずらしました。`;
+  }
   if (shouldScrollToEnd) {
     requestAnimationFrame(() => {
       elements.chatStream.scrollTop = elements.chatStream.scrollHeight;
@@ -2333,6 +2368,28 @@ function clampNumber(value, min, max, fallback) {
   return Math.min(max, Math.max(min, number));
 }
 
+function shiftFollowingMessageTimesInScene(messageId, previousTime, nextTime) {
+  const messageIndex = state.messages.findIndex((message) => message.id === messageId);
+  if (messageIndex === -1) return 0;
+  const shiftMinutes = timeToMinutes(nextTime) - timeToMinutes(previousTime);
+  if (shiftMinutes === 0) return 0;
+
+  let shiftedCount = 0;
+  for (let index = messageIndex + 1; index < state.messages.length; index += 1) {
+    const message = state.messages[index];
+    if (message.type === "scene") break;
+    if (!isTimeBearingMessage(message)) continue;
+    message.time = addMinutes(message.time, shiftMinutes);
+    shiftedCount += 1;
+  }
+  return shiftedCount;
+}
+
+function formatSignedMinutes(minutes) {
+  const value = Number(minutes) || 0;
+  return `${value >= 0 ? "+" : ""}${value}分`;
+}
+
 function getIntervalTime(startTime, interval, index) {
   const elapsedMinutes = Math.floor(interval * index + Number.EPSILON);
   return addMinutes(startTime, elapsedMinutes);
@@ -2371,25 +2428,21 @@ function getScriptImagePlan(script) {
 
 function getBulkImageValidation(script) {
   const plan = getScriptImagePlan(script);
-  if (plan.targetCount === 0) return { plan, error: "" };
-  if (bulkScriptImages.length < plan.targetCount) {
-    return { plan, error: `LINEに表示する画像が${plan.targetCount}枚必要です。` };
+  if (plan.targetCount === 0) return { plan, matchedCount: 0, missingCount: 0, error: "" };
+  if (bulkScriptImages.some((image) => image.number === null)) {
+    return { plan, matchedCount: 0, missingCount: plan.targetCount, error: "画像ファイル名に①②…の通し番号を入れてください。" };
   }
-  const targetImages = bulkScriptImages.slice(0, plan.targetCount);
-  if (targetImages.some((image) => image.number === null)) {
-    return { plan, error: "画像ファイル名に①②…の通し番号を入れてください。" };
+  const selectedNumbers = bulkScriptImages.map((image) => image.number);
+  if (new Set(selectedNumbers).size !== selectedNumbers.length) {
+    return { plan, matchedCount: 0, missingCount: plan.targetCount, error: "同じ通し番号の画像が複数あります。番号が重ならないようにしてください。" };
   }
-  const actualNumbers = targetImages.map((image) => image.number);
-  const expectedNumbers = Array.from({ length: plan.targetCount }, (_, index) => index + 1);
-  if (actualNumbers.some((number, index) => number !== expectedNumbers[index])) {
-    return { plan, error: `画像番号を${expectedNumbers.map((number) => circledImageNumbers[number - 1]).join("")}の順で揃えてください。` };
-  }
-  return { plan, error: "" };
+  const matchedCount = selectedNumbers.filter((number) => number <= plan.targetCount).length;
+  return { plan, matchedCount, missingCount: plan.targetCount - matchedCount, error: "" };
 }
 
 function renderBulkImageStatus() {
   const script = elements.bulkScriptInput.value;
-  const { plan, error } = getBulkImageValidation(script);
+  const { plan, matchedCount, missingCount, error } = getBulkImageValidation(script);
   if (!script.trim()) {
     elements.bulkImageStatus.textContent = bulkScriptImages.length
       ? `${bulkScriptImages.length}枚を選択済みです。台本を貼り付けると対応状況を確認できます。`
@@ -2406,7 +2459,7 @@ function renderBulkImageStatus() {
   const selectedText = bulkScriptImages.length ? ` 選択済み：${names}` : "";
   elements.bulkImageStatus.textContent = error
     ? `${error} 最後の【画像】1件はLINE画面から除外します。${selectedText}`
-    : `表示対象${plan.targetCount}件に画像を対応付けます。最後の【画像】1件はLINE画面から除外します。${selectedText}`;
+    : `表示対象${plan.targetCount}件のうち${matchedCount}件に画像を挿入し、不足する${missingCount}件は空の画像メッセージにします。最後の【画像】1件はLINE画面から除外します。${selectedText}`;
   elements.bulkImageStatus.classList.toggle("error", Boolean(error));
 }
 
@@ -2449,10 +2502,11 @@ function importBulkScript() {
   state.outputEndId = "";
   clearEditor({ nextTime: getLastMessageTime() || state.defaultTime });
   render();
-  const sceneText = importedSceneCount ? `、${importedSceneCount}件のシーン区切りを取得` : "";
+  const sceneText = importedSceneCount ? `とシーン区切り${importedSceneCount}件` : "";
   const imageText = importedImageCount ? `（画像${importedImageCount}件を含む）` : "";
+  const emptyImageText = imageValidation.missingCount ? ` 画像未設定の${imageValidation.missingCount}件は空の画像メッセージにしました。` : "";
   const excludedImageText = imageValidation.plan.totalCount ? " 最後の【画像】1件は除外しました。" : "";
-  elements.scriptStatus.textContent = `${importedMessageCount}件のメッセージ${imageText}${sceneText}を作成しました。${excludedImageText}時刻・既読・送信者は一覧上で直接変更できます。`;
+  elements.scriptStatus.textContent = `${importedMessageCount}件のメッセージ${imageText}${sceneText}を作成しました。${emptyImageText}${excludedImageText}時刻・既読・送信者は一覧上で直接変更できます。`;
 }
 
 function updateSpeakerChoices() {
@@ -2586,7 +2640,7 @@ function parseBulkScript(script, protagonist, images = []) {
     }
     if (entry.type === "image") {
       if (entryIndex === finalImageEntryIndex) return;
-      const image = images[imageIndex];
+      const image = images.find((candidate) => candidate.number === imageIndex + 1);
       const time = getIntervalTime(startTime, defaultMessageInterval, messageIndex);
       messages.push(makeImportedImageMessage(previousSender, image?.imageSrc || "", time));
       imageIndex += 1;
