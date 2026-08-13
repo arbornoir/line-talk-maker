@@ -2,6 +2,7 @@ const today = new Date();
 const pad = (value) => String(value).padStart(2, "0");
 const defaultDate = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
 const defaultMessageInterval = 0.5;
+const outputScale = 2;
 const circledImageNumbers = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"];
 const demoImageSrc =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 460'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='1'%3E%3Cstop stop-color='%23ffe08a'/%3E%3Cstop offset='.52' stop-color='%23ff7a59'/%3E%3Cstop offset='1' stop-color='%2306c755'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='640' height='460' rx='34' fill='url(%23g)'/%3E%3Ccircle cx='500' cy='100' r='70' fill='rgba(255,255,255,.42)'/%3E%3Cpath d='M70 345 235 190l105 98 75-70 155 127z' fill='rgba(255,255,255,.78)'/%3E%3Ctext x='54' y='72' fill='white' font-family='Arial,sans-serif' font-size='42' font-weight='700'%3EImage message%3C/text%3E%3C/svg%3E";
@@ -141,6 +142,8 @@ const elements = {
   scriptStatus: document.querySelector("#scriptStatus"),
   rangeStartSelect: document.querySelector("#rangeStartSelect"),
   rangeEndSelect: document.querySelector("#rangeEndSelect"),
+  previewScroll: document.querySelector("#previewScroll"),
+  outputSize: document.querySelector("#outputSize"),
   timeBulkStartSelect: document.querySelector("#timeBulkStartSelect"),
   timeBulkEndSelect: document.querySelector("#timeBulkEndSelect"),
   timeBulkModeSelect: document.querySelector("#timeBulkModeSelect"),
@@ -315,6 +318,7 @@ function bindEvents() {
   ].forEach((input) => input.addEventListener("input", updateTimeBulkEditor));
   elements.applyTimeBulkButton.addEventListener("click", applyTimeBulkChange);
   elements.undoTimeBulkButton.addEventListener("click", undoTimeBulkChange);
+  window.addEventListener("resize", updateOutputSize);
 }
 
 function render() {
@@ -329,10 +333,12 @@ function render() {
   renderTimeBulkRangeOptions();
   renderChat();
   renderMessageList();
+  requestAnimationFrame(updateOutputSize);
   scheduleAutoSave();
 }
 
 function renderChat() {
+  const previewScrollTop = elements.previewScroll.scrollTop;
   elements.chatStream.innerHTML = "";
   if (state.showInitialDate) {
     elements.chatStream.append(makeDateChip(formatDate(state.date)));
@@ -349,13 +355,16 @@ function renderChat() {
   getOutputMessages().forEach((message) => {
     if (message.type === "scene") return;
     if (message.type === "date") {
-      elements.chatStream.append(makeDateChip(formatDate(message.date)));
+      const dateChip = makeDateChip(formatDate(message.date));
+      bindPreviewMessageNavigation(dateChip, message);
+      elements.chatStream.append(dateChip);
       return;
     }
 
     const row = document.createElement("article");
     row.className = `message-row ${message.sender} ${message.type}`;
     row.classList.toggle("avatar-hidden", message.sender === "them" && !state.showAvatar);
+    bindPreviewMessageNavigation(row, message);
 
     if (message.sender === "them" && state.showAvatar) {
       const avatar = document.createElement("div");
@@ -380,6 +389,7 @@ function renderChat() {
         const img = document.createElement("img");
         img.src = message.imageSrc;
         img.alt = "送信画像";
+        img.addEventListener("load", updateOutputSize, { once: true });
         bubble.append(img);
       } else {
         bubble.classList.add("empty-image-bubble");
@@ -408,6 +418,15 @@ function renderChat() {
     row.append(wrap);
     elements.chatStream.append(row);
   });
+
+  restorePreviewScrollPosition(previewScrollTop);
+}
+
+function restorePreviewScrollPosition(scrollTop) {
+  elements.previewScroll.scrollTop = scrollTop;
+  requestAnimationFrame(() => {
+    elements.previewScroll.scrollTop = scrollTop;
+  });
 }
 
 function makeDateChip(text) {
@@ -415,6 +434,34 @@ function makeDateChip(text) {
   dateChip.className = "date-chip";
   dateChip.textContent = text;
   return dateChip;
+}
+
+function bindPreviewMessageNavigation(element, message) {
+  element.classList.add("preview-message-link");
+  element.tabIndex = 0;
+  element.setAttribute("role", "button");
+  element.setAttribute("aria-label", "メッセージ一覧の該当メッセージへ移動");
+  element.addEventListener("click", () => scrollToMessageListItem(message.id));
+  element.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    scrollToMessageListItem(message.id);
+  });
+}
+
+function scrollToMessageListItem(messageId) {
+  const item = [...elements.messageList.querySelectorAll(".list-item")]
+    .find((candidate) => candidate.dataset.messageId === messageId);
+  if (!item) return;
+  item.scrollIntoView({ block: "center", behavior: "smooth" });
+  item.focus({ preventScroll: true });
+  showJumpHighlight(item);
+}
+
+function showJumpHighlight(element) {
+  element.classList.remove("jump-highlight");
+  requestAnimationFrame(() => element.classList.add("jump-highlight"));
+  window.setTimeout(() => element.classList.remove("jump-highlight"), 1500);
 }
 
 function renderMessageList() {
@@ -444,6 +491,7 @@ function renderMessageList() {
     const item = document.createElement("div");
     item.className = "list-item";
     item.draggable = true;
+    item.tabIndex = -1;
     item.dataset.messageId = message.id;
     item.classList.toggle("insert-target", state.insertAfterId === message.id);
     bindMessageDragEvents(item, message.id);
@@ -871,6 +919,8 @@ function editMessage(id) {
   elements.editHint.textContent = "編集中";
   renderMessageTypeFields();
   syncReadAvailability();
+  elements.messageForm.scrollIntoView({ block: "start", behavior: "smooth" });
+  showJumpHighlight(elements.messageForm);
 }
 
 function deleteMessage(id) {
@@ -1009,6 +1059,19 @@ function syncReadAvailability() {
   elements.readInput.parentElement.style.opacity = isThem ? "0.5" : "1";
 }
 
+function getOutputPixelDimensions() {
+  const rect = elements.phoneScreen.getBoundingClientRect();
+  const width = Math.max(320, Math.round(rect.width || 390));
+  const height = Math.max(1, Math.ceil(elements.phoneScreen.scrollHeight || rect.height || 260));
+  return { width: width * outputScale, height: height * outputScale };
+}
+
+function updateOutputSize() {
+  if (!elements.outputSize) return;
+  const { width, height } = getOutputPixelDimensions();
+  elements.outputSize.textContent = `出力予定：横 ${width} × 縦 ${height} px`;
+}
+
 async function downloadTalkPng() {
   const canvas = await renderTalkToCanvas();
   canvas.toBlob((blob) => {
@@ -1038,7 +1101,7 @@ async function renderPhoneDomToCanvas() {
   const rect = source.getBoundingClientRect();
   const width = Math.max(320, Math.round(rect.width || 390));
   const height = Math.max(1, Math.ceil(source.scrollHeight || rect.height || 260));
-  const scale = 2;
+  const scale = outputScale;
   const clone = source.cloneNode(true);
   const originalStream = source.querySelector("#chatStream");
   const clonedStream = clone.querySelector("#chatStream");
@@ -1143,7 +1206,7 @@ async function renderTalkToCanvasManual() {
   const previewRect = elements.phoneScreen.getBoundingClientRect();
   const width = Math.max(320, Math.round(previewRect.width || 390));
   const height = Math.max(1, Math.ceil(elements.phoneScreen.scrollHeight || previewRect.height || 260));
-  const scale = 2;
+  const scale = outputScale;
   const canvas = document.createElement("canvas");
   canvas.width = width * scale;
   canvas.height = height * scale;

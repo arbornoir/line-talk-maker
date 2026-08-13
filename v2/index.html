@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0c6b49" />
     <title>LINE風トーク画像メーカー</title>
-    <link rel="stylesheet" href="./styles.css?v=20260806" />
+    <link rel="stylesheet" href="./styles.css?v=20260813-2" />
   </head>
   <body>
     <header class="app-header">
@@ -141,10 +141,13 @@
 
       <section class="preview-area" aria-label="プレビュー">
         <div class="preview-toolbar">
-          <div class="range-fields" aria-label="画像にする範囲">
-            <label><span>開始</span><select id="rangeStartSelect"></select></label><span class="range-separator">〜</span><label><span>終了</span><select id="rangeEndSelect"></select></label>
+          <div class="preview-toolbar-main">
+            <div class="range-fields" aria-label="画像にする範囲">
+              <label><span>開始</span><select id="rangeStartSelect"></select></label><span class="range-separator">〜</span><label><span>終了</span><select id="rangeEndSelect"></select></label>
+            </div>
+            <button type="button" id="downloadButton" class="primary-button">選択範囲をPNG保存</button>
           </div>
-          <button type="button" id="downloadButton" class="primary-button">選択範囲をPNG保存</button>
+          <output id="outputSize" class="output-size" aria-live="polite">出力予定：計算中</output>
         </div>
         <p class="preview-note">画像は選択範囲の全体を出力します。プレビューが長い場合のスクロールバーは画像の外側に表示され、PNGには入りません。</p>
         <div class="preview-scroll" id="previewScroll">
@@ -159,6 +162,6 @@
         </div>
       </section>
     </main>
-    <script src="./app.js?v=20260806"></script>
+    <script src="./app.js?v=20260813-2"></script>
   </body>
 </html>
